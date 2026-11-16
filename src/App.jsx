@@ -1,23 +1,25 @@
-import {useEffect,useMemo,useState} from 'react'
+import {useEffect,useMemo,useRef,useState} from 'react'
 import {sb} from './supabase'
 
 const HOST_PIN=import.meta.env.VITE_PIN_ALI
 const BOT=import.meta.env.VITE_BOT_USERNAME
+const HOST_NAME='علی'
 const L=['الف','ب','ج']
 const rnd=a=>a[Math.floor(Math.random()*a.length)]
 const buzz=n=>{try{navigator.vibrate&&navigator.vibrate(n||12)}catch(e){}}
 const digits=s=>(s||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim()
 const pad=n=>String(n).padStart(2,'0')
 const MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
-const normDate=s=>{
-  const p=digits(s).split(/\D+/).filter(Boolean)
-  if(p.length!==3) return ''
-  let [y,m,d]=p
-  if(y.length<=2)[y,d]=[d,y]
+const THEMES=[['','طلایی'],['blue','آبی'],['rose','رز'],['violet','بنفش']]
+const dayMax=m=>m<=6?31:30
+const EMPTY={d:'',m:'',y:''}
+const parseDate=s=>{const p=(s||'').split('-');return p.length===3?{d:String(+p[2]),m:String(+p[1]),y:p[0]}:EMPTY}
+const joinDate=v=>{
+  const y=+digits(v.y),m=+v.m,d=+digits(v.d)
+  if(!y||y<1300||y>1450||!m||!d||d>dayMax(m)) return ''
   return `${y}-${pad(m)}-${pad(d)}`
 }
-const fmtDate=s=>{const [y,m,d]=(s||'').split('-');return y?`${+d} ${MONTHS[+m-1]||''} ${y}`:''}
-const norm=s=>(s||'').trim().toLowerCase().replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\s]+/g,'')
+const dupMsg=e=>e.code==='23505'?'این تاریخ تولد برای یک نفر دیگر ثبت شده؛ تاریخ هر نفر باید فرق داشته باشد':e.message
 const notify=(type,id)=>fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,id})}).catch(()=>{})
 
 const P={
@@ -83,8 +85,7 @@ function advise(f){
 }
 const WIN=['دقیقاً همین بود 🎯','چه حدس خوبی 😏','ذهنت تیز است ⚡','داری منو می‌خونی 👀']
 const LOSE=['گول خوردی 😈','نزدیک بودی 🙈','سخت بود، قبول 😅']
-const BAD=['نه، دوباره فکر کن 😏','هنوز نه! تو که یادته 😄','اینقدرها هم سخت نیست 🙃']
-const FORGOT=['مگه می‌شه سال تولدت یادت بره؟ ما که یادمونه 😏','باشه، یه راهنمایی: یه عدد چهار رقمیه. بیشتر از این نمی‌گم 🤐','اگه واقعاً یادت نیست، به علی پیام بده. اون یادشه 😌']
+const BAD=['نه، دوباره فکر کن 😏','هنوز نه! تو که یادته ','اینقدرها هم سخت نیست 🙃']
 
 function useType(text,speed=16){
   const [o,setO]=useState('')
@@ -92,7 +93,7 @@ function useType(text,speed=16){
   return o
 }
 function Confetti({n=46}){
-  const ps=useMemo(()=>Array.from({length:n},(_,i)=>({x:(Math.random()-.5)*360,y:-(140+Math.random()*260),r:Math.random()*720-360,d:Math.random()*.3,c:['#f0d9a5','#d4b476','#fff7e6','#a3394a','#9b7be0'][i%5],w:6+Math.random()*6})),[])
+  const ps=useMemo(()=>Array.from({length:n},(_,i)=>({x:(Math.random()-.5)*360,y:-(140+Math.random()*260),r:Math.random()*720-360,d:Math.random()*.3,c:['var(--ac2)','var(--ac)','#fff7e6','var(--bad)','#9b7be0'][i%5],w:6+Math.random()*6})),[])
   return <div className="confetti">{ps.map((p,i)=><i key={i} style={{'--x':p.x+'px','--y':p.y+'px','--r':p.r+'deg',animationDelay:p.d+'s',background:p.c,width:p.w,height:p.w*1.6}}/>)}</div>
 }
 const Bg=()=><div className="bg"><i/><i/></div>
@@ -102,16 +103,49 @@ function Tip({k}){
   return <div className="tip rise"><div>{HELP[k].map((t,i)=><div key={i} className={i?'':'t1'}>{t}</div>)}</div><button onClick={()=>{localStorage.setItem('tip_'+k,'1');setOn(false)}}>فهمیدم</button></div>
 }
 
+function DateInput({v,set,onEnter}){
+  const up=k=>e=>set({...v,[k]:e.target.value})
+  return(
+    <div className="dob">
+      <input className="inp" type="tel" inputMode="numeric" maxLength={2} placeholder="روز" value={v.d} onChange={up('d')}/>
+      <select className="inp" value={v.m} onChange={up('m')}>
+        <option value="">ماه</option>
+        {MONTHS.map((x,i)=><option key={i} value={i+1}>{x}</option>)}
+      </select>
+      <input className="inp" type="tel" inputMode="numeric" maxLength={4} placeholder="سال" value={v.y} onChange={up('y')} onKeyDown={e=>e.key==='Enter'&&onEnter&&onEnter()}/>
+    </div>
+  )
+}
+
 export default function App(){
   const [sess,setSess]=useState(()=>{try{return JSON.parse(localStorage.getItem('sess'))}catch(e){return null}})
-  const [tab,setTab]=useState('play'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState('')
+  const [tab,setTab]=useState('play'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState(''),[secret,setSecret]=useState(false)
+  const [view,setViewS]=useState(()=>localStorage.getItem('view')||'')
+  const taps=useRef({n:0,t:0})
   const say=m=>{setToast(m);setTimeout(()=>setToast(''),2600)}
-  const login=s=>{localStorage.setItem('sess',JSON.stringify(s));setSess(s)}
+  const save=s=>{localStorage.setItem('sess',JSON.stringify(s));setSess(s)}
   const logout=()=>{localStorage.removeItem('sess');setSess(null);setTab('play');setEdit(null)}
+  const setView=id=>{localStorage.setItem('view',id);setViewS(id)}
   const go=t=>{if(t!=='write')setEdit(null);setTab(t)}
   const help=()=>{Object.keys(localStorage).filter(k=>k.startsWith('tip_')).forEach(k=>localStorage.removeItem(k));setNonce(n=>n+1);say('راهنما دوباره نشون داده شد 💡')}
-  if(!sess) return <><Bg/><Login onOk={login}/></>
+
+  useEffect(()=>{document.documentElement.dataset.theme=sess?.theme||''},[sess?.theme])
+  useEffect(()=>{
+    if(sess?.role!=='guest') return
+    sb.from('guests').select('id,name,slug,theme,notes').eq('id',sess.id).maybeSingle().then(({data,error})=>{
+      if(error) return
+      if(!data) return logout()
+      save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||''})
+    })
+  },[])
+
+  if(!sess) return <><Bg/><Login onOk={save}/></>
   const host=sess.role==='host'
+  const tapAv=()=>{
+    const t=taps.current,now=Date.now()
+    t.n=now-t.t>1600?1:t.n+1;t.t=now
+    if(t.n>=5){t.n=0;if(sess.notes){setSecret(true);buzz([15,30,15])}}
+  }
   const tabs=[['play','play','بازی'],['write','pen','بنویس'],['me','user','من']]
   return(
     <>
@@ -119,39 +153,58 @@ export default function App(){
       <div className="app">
         <header className="top">
           <div><div className="hi">سلام</div><div className={host?'who':'name sm'}>{sess.name}</div></div>
-          <div className="hr"><button className="hbtn" onClick={help} aria-label="راهنما"><Ic n="help" s={18}/></button><div className="av">{sess.name[0]}</div></div>
+          <div className="hr"><button className="hbtn" onClick={help} aria-label="راهنما"><Ic n="help" s={18}/></button><div className="av" onClick={tapAv}>{sess.name[0]}</div></div>
         </header>
         <main key={tab+(edit?.id||'')+nonce} className="page">
-          {tab==='play'&&<Play sess={sess}/>}
+          {tab==='play'&&<Play sess={sess} view={view}/>}
           {tab==='write'&&<Write sess={sess} edit={edit} say={say} onSaved={w=>{setEdit(null);setNonce(n=>n+1);setTab(w?'me':'write')}}/>}
-          {tab==='me'&&<Mine sess={sess} say={say} onEdit={q=>{setEdit(q);setTab('write')}} onLogout={logout}/>}
+          {tab==='me'&&<Mine sess={sess} say={say} view={view} setView={setView} onEdit={q=>{setEdit(q);setTab('write')}} onLogout={logout}/>}
         </main>
       </div>
       <nav className="tabbar">{tabs.map(([k,ic,lb])=><button key={k} className={tab===k?'on':''} onClick={()=>go(k)}><Ic n={ic}/><span>{lb}</span></button>)}</nav>
       <div className={'toast'+(toast?' show':'')}>{toast}</div>
+      {secret&&<Secret sess={sess} onClose={()=>setSecret(false)}/>}
     </>
+  )
+}
+
+function Secret({sess,onClose}){
+  const lines=(sess.notes||'').split('\n').map(x=>x.trim()).filter(Boolean)
+  return(
+    <div className="scrim" onClick={onClose}><div className="sheet tall" onClick={e=>e.stopPropagation()}>
+      <i className="grab"/><h3>🤫 فقط برای تو</h3>
+      <p className="sub">یه چیزی که یادمه.</p>
+      <div className="chat">
+        {lines.map((l,i)=>{
+          const k=l.indexOf(':'),who=k>0?l.slice(0,k).trim():'',txt=k>0?l.slice(k+1).trim():l
+          return <div key={i} className={'msg '+(who===HOST_NAME?'a':'b')} style={{'--d':i}}>{txt}</div>
+        })}
+      </div>
+    </div></div>
   )
 }
 
 function Login({onOk}){
   const [host,setHost]=useState(false),[pin,setPin]=useState('')
-  const [d,setD]=useState(''),[m,setM]=useState(''),[y,setY]=useState('')
+  const [v,setV]=useState(EMPTY)
   const [bad,setBad]=useState(''),[bk,setBk]=useState(0),[busy,setBusy]=useState(false),[hi,setHi]=useState(null)
   const fail=t=>{setBad(t);setBk(b=>b+1);buzz(40);setBusy(false)}
   const enter=async()=>{
     if(busy) return
     if(host){
-      if(!HOST_PIN||pin===HOST_PIN) return onOk({role:'host',name:'علی'})
+      if(!HOST_PIN||pin===HOST_PIN) return onOk({role:'host',name:HOST_NAME})
       return fail(rnd(BAD))
     }
-    const dd=+digits(d),yy=digits(y)
-    if(!dd||dd>31||!m||yy.length!==4) return fail('تاریخ تولدت رو کامل وارد کن 🎂')
+    const s=joinDate(v)
+    if(!s) return fail('تاریخ تولدت رو کامل و درست وارد کن 🎂')
     setBusy(true);setBad('')
-    const {data,error}=await sb.rpc('guest_login',{p:`${yy}-${pad(m)}-${pad(dd)}`})
+    const {data,error}=await sb.rpc('guest_login',{p:s})
     const g=data&&data[0]
     if(error||!g) return fail(rnd(BAD))
-    buzz([20,40,20]);setHi(g)
-    setTimeout(()=>onOk({role:'guest',id:g.id,name:g.name,slug:g.slug}),3200)
+    buzz([20,40,20])
+    document.documentElement.dataset.theme=g.theme||''
+    setHi(g)
+    setTimeout(()=>onOk({role:'guest',id:g.id,name:g.name,slug:g.slug,theme:g.theme||'',notes:g.notes||''}),3200)
   }
   if(hi) return(
     <div className="app login welcome">
@@ -162,17 +215,12 @@ function Login({onOk}){
   )
   return(
     <div className="app login">
-      <div className="eyebrow rise">{host?'میزبان':'دو حقیقت و یک دروغ'}</div>
+      <div className="eyebrow rise">{host?'میزبان':'دو دروغ و یک حقیقت'}</div>
       {!host&&<>
-        <h1 className="who big rise" style={{'--d':1}}>این بازی فقط برای یک نفر ساخته شده 🤫</h1>
+        <h1 className="who big rise" style={{'--d':1}}>این بازی فقط برای یک نفر ساخته شده </h1>
         <p className="lead small rise" style={{'--d':2}}>اگه خودشی، تاریخ تولدت رو بگو.</p>
-        <div key={bk} className={'dob rise'+(bad?' bad':'')} style={{'--d':3}}>
-          <input className="pin" type="tel" inputMode="numeric" maxLength={2} placeholder="روز" value={d} onChange={e=>setD(e.target.value)}/>
-          <select className="pin" value={m} onChange={e=>setM(e.target.value)}>
-            <option value="">ماه</option>
-            {MONTHS.map((x,i)=><option key={i} value={i+1}>{x}</option>)}
-          </select>
-          <input className="pin" type="tel" inputMode="numeric" maxLength={4} placeholder="سال" value={y} onChange={e=>setY(e.target.value)} onKeyDown={e=>e.key==='Enter'&&enter()}/>
+        <div key={bk} className={'rise'+(bad?' bad':'')} style={{'--d':3,width:'100%'}}>
+          <DateInput v={v} set={setV} onEnter={enter}/>
         </div>
       </>}
       {host&&<>
@@ -180,7 +228,7 @@ function Login({onOk}){
         <input key={bk} className={'pin'+(bad?' bad':'')} type="password" placeholder="رمز" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&enter()}/>
       </>}
       {bad&&<p className="red mt">{bad}</p>}
-      <button className="btn big" disabled={busy} onClick={enter}>{host?'ورود':'منم 😏'}</button>
+      <button className="btn big" disabled={busy} onClick={enter}>{host?'ورود':'ورود'}</button>
       <button className="link faint" onClick={()=>{setHost(!host);setBad('');setPin('')}}>{host?'بازگشت':'میزبان'}</button>
     </div>
   )
@@ -260,7 +308,7 @@ function Write({sess,edit,onSaved,say}){
   )
 }
 
-function Mine({sess,say,onEdit,onLogout}){
+function Mine({sess,say,view,setView,onEdit,onLogout}){
   const host=sess.role==='host'
   const [list,setList]=useState(null),[gmap,setGmap]=useState({}),[open,setOpen]=useState(null),[sure,setSure]=useState(false),[sheet,setSheet]=useState(null)
   const load=async()=>{
@@ -283,7 +331,7 @@ function Mine({sess,say,onEdit,onLogout}){
       <div className="between"><h2 className="h">سؤال‌های من</h2>
         <div className="hr">
           <button className="mini" onClick={()=>setSheet('msg')}>💌 پیام</button>
-          {host?<button className="mini" onClick={()=>setSheet('set')}><Ic n="gear" s={15}/></button>
+          {host?<button className="mini" onClick={()=>setSheet('set')}><Ic n="gear" s={15}/> تنظیمات</button>
             :BOT&&<a className="mini" href={`https://t.me/${BOT}?start=${sess.slug}`} target="_blank" rel="noreferrer">🔔 تلگرام</a>}
         </div>
       </div>
@@ -313,7 +361,7 @@ function Mine({sess,say,onEdit,onLogout}){
         </div>
       )}
       {sheet==='msg'&&(host?<Inbox onClose={()=>setSheet(null)}/>:<MsgSheet sess={sess} say={say} onClose={()=>setSheet(null)}/>)}
-      {sheet==='set'&&<Guests say={say} onClose={()=>setSheet(null)}/>}
+      {sheet==='set'&&<Guests say={say} view={view} setView={setView} onClose={()=>setSheet(null)}/>}
     </>
   )
 }
@@ -352,45 +400,81 @@ function Inbox({onClose}){
   )
 }
 
-function Guests({say,onClose}){
-  const [gs,setGs]=useState(null),[nm,setNm]=useState(''),[yr,setYr]=useState(''),[sure,setSure]=useState(null)
+function ThemePick({v,set}){
+  return <div className="chips">{THEMES.map(([k,n])=><button key={k||'gold'} type="button" className={'chip2'+(v===k?' on':'')} onClick={()=>set(k)}><i className={'dot '+(k||'gold')}/>{n}</button>)}</div>
+}
+
+function GuestCard({g,active,onView,say,reload,copy}){
+  const [name,setName]=useState(g.name),[v,setV]=useState(parseDate(g.secret)),[theme,setTheme]=useState(g.theme||''),[notes,setNotes]=useState(g.notes||''),[sure,setSure]=useState(false)
+  const sec=joinDate(v)
+  const dirty=name.trim()!==g.name||sec!==g.secret||theme!==(g.theme||'')||notes!==(g.notes||'')
+  const save=async()=>{
+    if(!name.trim()) return say('اسم را بنویس')
+    if(!sec) return say('تاریخ تولد کامل و درست نیست')
+    const {error}=await sb.from('guests').update({name:name.trim(),secret:sec,theme,notes}).eq('id',g.id)
+    if(error) return say(dupMsg(error))
+    say('ذخیره شد ✅');reload()
+  }
+  const del=async()=>{await sb.from('guests').delete().eq('id',g.id);reload()}
+  return(
+    <div className={'gbox'+(active?' act':'')}>
+      <input className="field s" placeholder="اسم" value={name} onChange={e=>setName(e.target.value)}/>
+      <div className="gap"/>
+      <DateInput v={v} set={setV}/>
+      <ThemePick v={theme} set={setTheme}/>
+      <details className="more">
+        <summary>یادداشت یواشکی</summary>
+        <textarea className="field" placeholder={'هر خط یک پیام:\nعلی: ...\nیسنا: ...'} value={notes} onChange={e=>setNotes(e.target.value)}/>
+        <p className="sub">این‌ها فقط وقتی نشان داده می‌شود که او ۵ بار پشت‌سرهم روی دایره‌ی اسمش (بالا) بزند.</p>
+      </details>
+      <div className="tgs">{g.chat_id?'🔔 تلگرام متصل'+(g.tg_username?' · @'+g.tg_username:''):'🔕 تلگرام متصل نیست'}</div>
+      <div className="acts wrapx">
+        <button className={'mini'+(active?' gold':'')} onClick={onView}>{active?'✓ سؤال‌هایش در بازی':'سؤال‌هایش را بیاور'}</button>
+        {BOT&&<button className="mini" onClick={()=>copy(`https://t.me/${BOT}?start=${g.slug}`,'لینک ربات کپی شد 🔔')}><Ic n="copy" s={14}/> لینک ربات</button>}
+        {sure?<button className="mini red" onClick={del}>مطمئنی؟</button>:<button className="mini red" onClick={()=>setSure(true)}><Ic n="trash" s={14}/></button>}
+      </div>
+      {dirty&&<button className="btn big" onClick={save}>ذخیره‌ی تغییرات</button>}
+    </div>
+  )
+}
+
+function Guests({say,onClose,view,setView}){
+  const [gs,setGs]=useState(null),[nm,setNm]=useState(''),[v,setV]=useState(EMPTY),[theme,setTheme]=useState('')
   const load=async()=>{const {data}=await sb.from('guests').select('*').order('created_at');setGs(data||[])}
   useEffect(()=>{load()},[])
-  const add=async()=>{
-  const sec=normDate(yr)
-if(!sec) return say('مهم ترین تاریخ تقویم ')
-const {error}=await sb.from('guests').insert({name:nm.trim(),secret:sec,slug:Math.random().toString(36).slice(2,8)})
-  
-    if(error) return say(error.message)
-    setNm('');setYr('');load();say('اضافه شد ✅')
-  
-  }
-  const upd=async(id,p)=>{await sb.from('guests').update(p).eq('id',id);load()}
   const copy=async(txt,m)=>{try{await navigator.clipboard.writeText(txt);say(m)}catch(e){say(txt)}}
-  const del=async id=>{await sb.from('guests').delete().eq('id',id);setSure(null);load()}
+  const add=async()=>{
+    if(!nm.trim()) return say('اسم را بنویس')
+    const sec=joinDate(v)
+    if(!sec) return say('تاریخ تولد را کامل و درست وارد کن (روز، ماه، سال)')
+    const {error}=await sb.from('guests').insert({name:nm.trim(),secret:sec,theme,slug:Math.random().toString(36).slice(2,8)})
+    if(error) return say(dupMsg(error))
+    setNm('');setV(EMPTY);setTheme('');load();say('اضافه شد ✅')
+  }
+  const shown=gs&&gs.length?(gs.find(g=>g.id===view)||gs[0]).id:null
   return(
     <div className="scrim" onClick={onClose}><div className="sheet tall" onClick={e=>e.stopPropagation()}>
-      <i className="grab"/><h3>مخاطب‌ها</h3>
-      <p className="sub">هر مخاطب لینک اختصاصی دارد و فقط سؤال‌های خودش را می‌بیند. لینک ساده‌ی سایت از آدم‌ها اسم می‌پرسد، پس هیچ اسمی لو نمی‌رود.</p>
-      {gs?.map(g=>(
-        <div key={g.id} className="gbox">
-          <div className="grow2">
-            <input className="field s" defaultValue={g.name} onBlur={e=>e.target.value.trim()&&e.target.value!==g.name&&upd(g.id,{name:e.target.value.trim()})}/>
-            <input className="field s yr" placeholder="سال تولد" maxLength={4} inputMode="numeric" defaultValue={g.secret} onBlur={e=>digits(e.target.value)!==g.secret&&upd(g.id,{secret:digits(e.target.value)})}/>
-          </div>
-          <div className="tgs">{g.chat_id?'🔔 تلگرام متصل'+(g.tg_username?' · @'+g.tg_username:''):'🔕 تلگرام متصل نیست'}</div>
-          <div className="acts wrapx">
-            <button className="mini" onClick={()=>copy(location.origin+'/?for='+g.slug,'لینک بازی کپی شد 🔗')}><Ic n="copy" s={14}/> لینک بازی</button>
-            {BOT&&<button className="mini" onClick={()=>copy(`https://t.me/${BOT}?start=${g.slug}`,'لینک تلگرام کپی شد 🔔')}><Ic n="copy" s={14}/> لینک ربات</button>}
-            {sure===g.id?<button className="mini red" onClick={()=>del(g.id)}>مطمئنی؟</button>:<button className="mini red" onClick={()=>setSure(g.id)}><Ic n="trash" s={14}/></button>}
-          </div>
-        </div>
-      ))}
+      <i className="grab"/><h3>تنظیمات</h3>
+      <div className="how">
+        <b>چطور کاربر اضافه کنم؟</b>
+        <ol>
+          <li>پایین همین صفحه اسم و تاریخ تولد کامل (روز، ماه، سال شمسی) را بنویس و «افزودن» را بزن.</li>
+          <li>همه یک لینک دارند: لینک سایت. دکمه‌ی زیر را بزن و برایش بفرست.</li>
+          <li>او فقط تاریخ تولدش را می‌زند؛ اگر درست بود با اسم خودش خوش‌آمد می‌شنود و وارد می‌شود.</li>
+          <li>تاریخ تولد دو نفر نباید یکی باشد، چون ورود فقط با همین انجام می‌شود.</li>
+        </ol>
+        <button className="mini gold" onClick={()=>copy(location.origin,'لینک سایت کپی شد 🔗')}><Ic n="copy" s={14}/> کپی لینک سایت</button>
+      </div>
+      <p className="sub">وقتی بازی می‌کنی، سؤال‌های مخاطبی که «در بازی» علامت دارد می‌آید.</p>
+      {!gs&&<div className="skel"/>}
+      {gs?.map(g=><GuestCard key={g.id} g={g} active={g.id===shown} onView={()=>{setView(g.id);say('سؤال‌های '+g.name+' در بازی می‌آید ✅')}} say={say} reload={load} copy={copy}/>)}
       <div className="gbox">
-        <div className="grow2">
-          <input className="field s" placeholder="اسم مخاطب جدید" value={nm} onChange={e=>setNm(e.target.value)}/>
-          <input className="field s yr" placeholder="سال تولد" maxLength={4} inputMode="numeric" value={yr} onChange={e=>setYr(e.target.value)}/>
-        </div>
+        <b className="gold">مخاطب جدید</b>
+        <div className="gap"/>
+        <input className="field s" placeholder="اسم" value={nm} onChange={e=>setNm(e.target.value)}/>
+        <div className="gap"/>
+        <DateInput v={v} set={setV} onEnter={add}/>
+        <ThemePick v={theme} set={setTheme}/>
         <button className="btn big" onClick={add}>افزودن</button>
       </div>
     </div></div>
@@ -407,11 +491,11 @@ function Pick({q,onDone}){
   }
   return(
     <>
-      <div className="meter">{[0,1].map(k=><i key={k} className={sel.length>k?'on':''}/>)}<span>{sel.length} از ۲ دروغ پیدا شد</span></div>
+      <div className="meter">{[0,1].map(k=><i key={k} className={sel.length>k?'on':''}/>)}<span>{sel.length} از ۲ دروغ</span></div>
       <div className="grow">
         {q.statements.map((t,i)=>(
           <button key={i} className={'opt pick'+(sel.includes(i)?' sel':'')} style={{'--d':i}} onClick={()=>tap(i)}>
-            <span className="badge">{sel.includes(i)?'✗':L[i]}</span><span className="tx">{t}</span>{sel.includes(i)&&<span className="tag">دروغ</span>}
+            <span className="badge">{L[i]}</span><span className="tx">{t}</span>{sel.includes(i)&&<span className="tag">دروغ</span>}
           </button>
         ))}
       </div>
@@ -419,19 +503,20 @@ function Pick({q,onDone}){
   )
 }
 
-function Play({sess}){
+function Play({sess,view}){
   const host=sess.role==='host',me=host?'host':sess.id
-  const [guests,setGuests]=useState([]),[gid,setGid]=useState(null)
+  const [guests,setGuests]=useState(host?null:[])
   const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0)
   useEffect(()=>{
     if(!host) return
-    sb.from('guests').select('id,name').order('created_at').then(({data})=>{
-      const d=data||[];setGuests(d)
-      if(d.length) setGid(d[0].id); else setQs([])
-    })
+    sb.from('guests').select('id,name').order('created_at').then(({data})=>setGuests(data||[]))
   },[])
+  const wait=host&&guests===null
+  const gid=host&&guests&&guests.length?(guests.find(g=>g.id===view)||guests[0]).id:null
+  const gname=guests?.find(g=>g.id===gid)?.name
   useEffect(()=>{
-    if(host&&!gid) return
+    if(wait) return
+    if(host&&!gid){setQs([]);return}
     let alive=true
     setQs(null);setI(0);setRes(null);setScore(0);setStreak(0)
     ;(async()=>{
@@ -441,10 +526,9 @@ function Play({sess}){
       if(alive) setQs((data||[]).filter(x=>!x.answers.some(a=>a.responder===me)))
     })()
     return()=>{alive=false}
-  },[gid])
-  const chips=host&&guests.length>1&&<div className="gchips">{guests.map(g=><button key={g.id} className={'gc'+(g.id===gid?' on':'')} onClick={()=>setGid(g.id)}>{g.name}</button>)}</div>
-  if(!qs) return <>{chips}<div className="skel"/></>
-  if(!qs.length) return <>{chips}<div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?'وقتی مخاطب سؤال تازه‌ای بنویسد، اینجا می‌آید.':'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p></div></>
+  },[wait,gid])
+  if(!qs) return <div className="skel"/>
+  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p></div>
   if(i>=qs.length){
     const good=score>=Math.ceil(qs.length/2)
     return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'باید بیشتر حرف بزنید ☕'}</h2><p className="sub">بعد از دیت، یه دور دیگه بازی کنید.</p></div></>
@@ -458,7 +542,6 @@ function Play({sess}){
   }
   return(
     <div key={q.id} className="fillcol">
-      {chips}
       {res?.correct&&<><div className="glow"/><Confetti/></>}
       <div className="prog">{qs.map((_,k)=><i key={k} className={k<i?'done':k===i?'cur':''}/>)}</div>
       <div className="between"><div className="eyebrow">{i+1} از {qs.length}</div>{streak>=2&&<span className="streak">🔥 ×{streak}</span>}</div>
@@ -467,7 +550,13 @@ function Play({sess}){
       {res&&(
         <div className="res rise">
           <div className="grow">
-            {q.statements.map((t,k)=><div key={k} className={'opt '+(k===q.truth_index?'truth':'lie')}><span className="badge">{k===q.truth_index?<Ic n="check" s={16}/>:<Ic n="x" s={14}/>}</span><span className="tx">{t}</span>{res.lies.includes(k)&&<span className="tag">انتخاب تو</span>}</div>)}
+            {q.statements.map((t,k)=>(
+              <div key={k} className={'opt '+(k===q.truth_index?'truth':'lie')}>
+                <span className="badge">{k===q.truth_index?<Ic n="check" s={16}/>:<Ic n="x" s={14}/>}</span>
+                <span className="tx">{t}</span>
+                <span className="tag">{k===q.truth_index?'حقیقت':res.lies.includes(k)?'انتخاب تو':'دروغ'}</span>
+              </div>
+            ))}
             <div className={'verdict '+(res.correct?'ok':'no')}>{res.word}</div>
             {q.story&&<div className="story"><span>داستانش</span>{q.story}</div>}
           </div>
