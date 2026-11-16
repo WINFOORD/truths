@@ -51,7 +51,7 @@ export default async function handler(req, res) {
             const { data: q, error } = await db.from('questions').select('id,owner,truth_index').eq('id', row.question_id).maybeSingle()
             if (error || !q || q.owner !== 'host') return res.status(403).json({ error: 'این سؤال قابل پاسخ نیست' })
             const lies = [0, 1, 2].filter(n => n !== q.truth_index)
-            checked.push({ question_id: q.id, responder: session.id, picked_lies: row.picked_lies, correct: lies.every(n => row.picked_lies.includes(n)) })
+            checked.push({ question_id: q.id, responder: session.id, picked_lies: row.picked_lies, correct: lies.every(n => row.picked_lies.includes(n)), reported: false })
           }
           values = checked
         }

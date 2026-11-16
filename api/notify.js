@@ -6,6 +6,66 @@ export default async function handler(req, res) {
   const session = readSession(req)
   if (!session) return res.status(401).json({ error: 'نشست معتبر نیست' })
   const { type, id } = req.body || {}
+  if (type === 'results') {
+    if (session.role !== 'guest') return res.status(403).json({ error: 'دسترسی مجاز نیست' })
+    try {
+      const { data: questions, error: questionsError } = await db.from('questions')
+        .select('id,prompt,statements,truth_index')
+        .eq('owner', 'host')
+      if (questionsError) throw questionsError
+      if (!questions?.length) return res.status(200).json({ ok: true, complete: false })
+
+      const questionIds = questions.map(q => q.id)
+      const { data: answers, error: answersError } = await db.from('answers')
+        .select('question_id,picked_lies,correct,reported')
+        .eq('responder', session.id)
+        .in('question_id', questionIds)
+      if (answersError) throw answersError
+      const byQuestion = new Map((answers || []).map(answer => [answer.question_id, answer]))
+      if (questions.some(q => !byQuestion.has(q.id))) {
+        return res.status(200).json({ ok: true, complete: false })
+      }
+
+      const pending = (answers || []).filter(answer => !answer.reported)
+      if (!pending.length) return res.status(200).json({ ok: true, complete: true, alreadySent: true })
+
+      const correctCount = (answers || []).filter(answer => answer.correct).length
+      const average = Math.round(correctCount * 100 / answers.length)
+      const questionById = new Map(questions.map(q => [q.id, q]))
+      const parts = pending.map((answer, index) => {
+        const q = questionById.get(answer.question_id)
+        const picked = answer.picked_lies.map(n => q.statements[n]).filter(Boolean)
+        const truth = q.statements[q.truth_index]
+        return `${index + 1}) ${q.prompt || truth}\nجواب: ${picked.join(' | ')}\nحقیقت: ${truth}\n${answer.correct ? '✅ درست' : '❌ نادرست'}`
+      })
+      const header = `🎯 نتیجه‌ی ${session.name}\nمیانگین تفاهم: ${average}٪ (${correctCount} از ${answers.length} جواب درست)\nجواب‌های جدید: ${pending.length}`
+      const messages = []
+      let message = header
+      for (const part of parts) {
+        if (message.length + part.length + 2 > 3500) {
+          messages.push(message)
+          message = `ادامه‌ی جواب‌های ${session.name}:\n${part}`
+        } else message += `\n\n${part}`
+      }
+      messages.push(message)
+
+      for (const text of messages) {
+        if (!await tg(process.env.TELEGRAM_HOST_CHAT_ID, text)) {
+          return res.status(200).json({ ok: true, complete: true, sent: false })
+        }
+      }
+
+      const { error: updateError } = await db.from('answers')
+        .update({ reported: true })
+        .eq('responder', session.id)
+        .in('question_id', pending.map(answer => answer.question_id))
+      if (updateError) throw updateError
+      return res.status(200).json({ ok: true, complete: true, sent: true })
+    } catch (error) {
+      console.error('results notification error', error)
+      return res.status(500).json({ error: 'ارسال نتیجه انجام نشد' })
+    }
+  }
   if (!id || !['question', 'message'].includes(type)) return res.status(400).json({ error: 'درخواست معتبر نیست' })
   try {
     if (type === 'question') {

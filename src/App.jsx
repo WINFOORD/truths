@@ -6,6 +6,10 @@ const HOST_NAME='علی'
 const L=['الف','ب','ج']
 const rnd=a=>a[Math.floor(Math.random()*a.length)]
 const buzz=n=>{try{navigator.vibrate&&navigator.vibrate(n||12)}catch(e){}}
+const noteText=value=>{
+  const text=typeof value==='string'?value.trim():''
+  return text.length>=2&&text.startsWith('"')&&text.endsWith('"')?text.slice(1,-1):text
+}
 const THEMES=[['','طلایی'],['blue','آبی'],['rose','رز'],['violet','بنفش']]
 const dupMsg=e=>e.code==='23505'?'این مخاطب یا شناسه قبلاً ثبت شده است':e.message
 const notify=async(type,id)=>{try{const r=await fetch('/api/notify',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,id})});return await r.json().catch(()=>({ok:false,sent:false}))}catch{return {ok:false,sent:false}}}
@@ -96,11 +100,13 @@ export default function App(){
   const [sess,setSess]=useState(null)
   const [authReady,setAuthReady]=useState(false)
   const [tab,setTab]=useState('play'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState(''),[secret,setSecret]=useState(false)
+  const [entryNote,setEntryNote]=useState('')
+  const notifiedGuest=useRef(null)
   const [view,setViewS]=useState(()=>localStorage.getItem('view')||'')
   const taps=useRef({n:0,t:0})
   const say=m=>{setToast(m);setTimeout(()=>setToast(''),2600)}
   const save=s=>setSess(s)
-  const logout=()=>{fetch('/api/auth',{method:'DELETE',credentials:'same-origin'}).catch(()=>{});localStorage.removeItem('sess');setSess(null);setTab('play');setEdit(null)}
+  const logout=()=>{fetch('/api/auth',{method:'DELETE',credentials:'same-origin'}).catch(()=>{});localStorage.removeItem('sess');notifiedGuest.current=null;setSess(null);setEntryNote('');setTab('play');setEdit(null)}
   const setView=id=>{localStorage.setItem('view',id);setViewS(id)}
   const go=t=>{if(t!=='write')setEdit(null);setTab(t)}
   const help=()=>{Object.keys(localStorage).filter(k=>k.startsWith('tip_')).forEach(k=>localStorage.removeItem(k));setNonce(n=>n+1);say('راهنما دوباره نشون داده شد 💡')}
@@ -123,10 +129,15 @@ export default function App(){
   useEffect(()=>{
     if(sess?.role!=='guest') return
     let alive=true
-    sb.from('guests').select('id,name,slug,theme,notes').eq('id',sess.id).maybeSingle().then(({data,error})=>{
+    sb.from('guests').select('id,name,slug,theme,notes,invite_token').eq('id',sess.id).maybeSingle().then(({data,error})=>{
       if(!alive||error)return
       if(!data)return logout()
-      save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||''})
+      const note=noteText(data.notes)
+      save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||'',invite_token:data.invite_token})
+      if(notifiedGuest.current!==data.id){
+        notifiedGuest.current=data.id
+        if(note)setEntryNote(note)
+      }
     })
     return()=>{alive=false}
   },[sess?.id])
@@ -157,6 +168,7 @@ export default function App(){
       <nav className="tabbar">{tabs.map(([k,ic,lb])=><button key={k} className={tab===k?'on':''} onClick={()=>go(k)}><Ic n={ic}/><span>{lb}</span></button>)}</nav>
       <div className={'toast'+(toast?' show':'')}>{toast}</div>
       {secret&&<Secret sess={sess} onClose={()=>setSecret(false)}/>}
+      {entryNote&&<EntryNotice note={entryNote} onClose={()=>setEntryNote('')}/>}
     </>
   )
 }
@@ -177,6 +189,19 @@ function Secret({sess,onClose}){
   )
 }
 
+function EntryNotice({note,onClose}){
+  return(
+    <div className="scrim" onClick={onClose}>
+      <div className="sheet entry-notice" role="dialog" aria-modal="true" aria-labelledby="entry-notice-title" onClick={e=>e.stopPropagation()}>
+        <i className="grab"/>
+        <h3 id="entry-notice-title">💌 یه پیام برای تو</h3>
+        <p className="entry-notice-text">{note}</p>
+        <button className="btn big" onClick={onClose}>دیدم ✨</button>
+      </div>
+    </div>
+  )
+}
+
 function Login({onOk}){
   const [host,setHost]=useState(false),[pin,setPin]=useState('')
   const [bad,setBad]=useState(''),[bk,setBk]=useState(0),[busy,setBusy]=useState(false),[hi,setHi]=useState(null)
@@ -193,7 +218,7 @@ function Login({onOk}){
       buzz([20,40,20]);document.documentElement.dataset.theme=session.theme||''
       setHi(session)
       history.replaceState({},'',location.pathname)
-      setTimeout(()=>onOk(session),2600)
+      setTimeout(()=>onOk(session),6000)
     }catch{fail('ارتباط با سرور برقرار نشد؛ دوباره تلاش کن')}
   }
   useEffect(()=>{if(invite)guestEnter(invite)},[])
@@ -214,7 +239,7 @@ function Login({onOk}){
       <div className="eyebrow rise">این لحظه برای توئه</div>
       <h1 className="name rise">{hi.name}</h1>
       <p className="lead rise" style={{'--d':2}}>خوش اومدی ✨</p>
-      <p className="lead rise" style={{'--d':3}}>یه بازی کوچیک، با چندتا چیز که فقط تو می‌فهمی.</p>
+      <p className="lead rise" style={{'--d':3}}>این یه تستِ ببینم چقدر منو می‌شناسی؛ بعدش تو هم می‌تونی برام سؤال طراحی کنی که یکم حوصله‌مون سر نره 😄</p>
     </div>
   )
   if(invite&&busy) return <div className="app login"><div className="glow"/><div className="ring soft">✦</div><p className="lead">دارم در رو برات باز می‌کنم…</p></div>
@@ -314,6 +339,11 @@ function Write({sess,edit,onSaved,say}){
 function Mine({sess,say,view,setView,onEdit,onLogout}){
   const host=sess.role==='host'
   const [list,setList]=useState(null),[gmap,setGmap]=useState({}),[open,setOpen]=useState(null),[sure,setSure]=useState(false),[sheet,setSheet]=useState(null)
+  const copyInvite=async()=>{
+    const url=`${location.origin}/?invite=${sess.invite_token}`
+    try{await navigator.clipboard.writeText(url);say('لینک اختصاصی کپی شد 🔗')}
+    catch{say(url)}
+  }
   const load=async()=>{
     let q=sb.from('questions').select('*, answers(*)').order('created_at',{ascending:false})
     q=host?q.eq('owner','host'):q.eq('owner','guest').eq('guest_id',sess.id)
@@ -335,7 +365,7 @@ function Mine({sess,say,view,setView,onEdit,onLogout}){
         <div className="hr">
           <button className="mini" onClick={()=>setSheet('msg')}>💌 پیام</button>
           {host?<button className="mini" onClick={()=>setSheet('set')}><Ic n="gear" s={15}/> تنظیمات</button>
-            :BOT&&<a className="mini" href={`https://t.me/${BOT}?start=${sess.slug}`} target="_blank" rel="noreferrer">🔔 تلگرام</a>}
+            :<>{sess.invite_token&&<button className="mini" onClick={copyInvite}>🔗 لینک اختصاصی</button>}{BOT&&<a className="mini" href={`https://t.me/${BOT}?start=${sess.slug}`} target="_blank" rel="noreferrer">🔔 تلگرام</a>}</>}
         </div>
       </div>
       <Tip k="me"/>
@@ -504,7 +534,7 @@ function Pick({q,onDone}){
 function Play({sess,view}){
   const host=sess.role==='host',me=host?'host':sess.id
   const [guests,setGuests]=useState(host?null:[])
-  const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[isDemo,setIsDemo]=useState(false)
+  const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[isDemo,setIsDemo]=useState(false),[reportStatus,setReportStatus]=useState('')
   useEffect(()=>{
     if(!host) return
     sb.from('guests').select('id,name').order('created_at').then(({data})=>setGuests(data||[]))
@@ -525,16 +555,32 @@ function Play({sess,view}){
     })()
     return()=>{alive=false}
   },[wait,gid])
+  useEffect(()=>{
+    if(host||!qs||qs.length) return
+    notify('results').then(result=>{
+      if(result?.sent||result?.alreadySent)setReportStatus('sent')
+      else if(result?.complete)setReportStatus('failed')
+    })
+  },[host,qs])
   if(!qs) return <div className="skel"/>
-  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p><button className="btn big" onClick={()=>{setQs([DEMO_Q]);setIsDemo(true);setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور آزمایشی بازی کنیم 🎲</button></div>
+  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد.'}</p>}<button className="btn big" onClick={()=>{setQs([DEMO_Q]);setIsDemo(true);setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور آزمایشی بازی کنیم {qs}🎲</button></div>
   if(i>=qs.length){
     const good=score>=Math.ceil(qs.length/2),target=host?(gname||'مخاطبت'):'علی'
-    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p><button className="btn big" onClick={()=>{setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور دیگه 🔁</button>{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
+    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد؛ بعداً دوباره تلاش می‌کنیم.'}</p>}<button className="btn big" onClick={()=>{setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور دیگه 🔁</button>{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
   }
   const q=qs[i]
-  const done=lies=>{
+  const done=async lies=>{
     const correct=[0,1,2].filter(x=>x!==q.truth_index).every(x=>lies.includes(x))
-    if(!isDemo) sb.from('answers').insert({question_id:q.id,responder:me,picked_lies:lies,correct}).then(({error})=>{if(error)console.error('answer save failed',error)})
+    let answerSaved=true
+    if(!isDemo){
+      const {error}=await sb.from('answers').insert({question_id:q.id,responder:me,picked_lies:lies,correct})
+      if(error){answerSaved=false;console.error('answer save failed',error)}
+      if(answerSaved&&i+1===qs.length){
+        notify('results').then(result=>{
+          setReportStatus(result?.sent||result?.alreadySent?'sent':'failed')
+        })
+      }else if(!answerSaved&&i+1===qs.length)setReportStatus('failed')
+    }
     if(correct){setScore(s=>s+1);setStreak(s=>s+1);buzz([20,40,20])}else{setStreak(0);buzz(60)}
     setRes({correct,word:rnd(correct?WIN:LOSE),lies})
   }

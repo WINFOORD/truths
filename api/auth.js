@@ -15,10 +15,10 @@ export default async function handler(req, res) {
     } else if (role === 'guest') {
       const invite = typeof req.body?.invite === 'string' ? req.body.invite : ''
       if (!/^[a-f0-9]{32,64}$/i.test(invite)) return res.status(400).json({ error: 'لینک دعوت معتبر نیست' })
-      const { data: g, error } = await db.from('guests').select('id,name,slug,theme,notes').eq('invite_token', invite).maybeSingle()
+      const { data: g, error } = await db.from('guests').select('id,name,slug,theme,notes,invite_token').eq('invite_token', invite).maybeSingle()
       if (error) throw error
       if (!g) return res.status(401).json({ error: 'این لینک دعوت معتبر نیست یا غیرفعال شده' })
-      session = { role: 'guest', id: g.id, name: g.name, slug: g.slug, theme: g.theme || '', notes: g.notes || '' }
+      session = { role: 'guest', id: g.id, name: g.name, slug: g.slug, theme: g.theme || '', notes: g.notes || '', invite_token: g.invite_token }
       maxAge = 60 * 60 * 24 * 30
     } else return res.status(400).json({ error: 'نوع ورود معتبر نیست' })
     const token = createSession(session, maxAge)

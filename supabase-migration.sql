@@ -13,6 +13,9 @@ alter table public.guests
 alter table public.questions
   add column if not exists notified boolean not null default false;
 
+alter table public.answers
+  add column if not exists reported boolean not null default false;
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   guest_id uuid references public.guests(id) on delete cascade,

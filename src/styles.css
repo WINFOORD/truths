@@ -186,3 +186,5 @@ textarea.field{min-height:110px;resize:none}
 .tgs{font-size:.76rem;color:var(--mute);margin-top:8px}
 .acts.wrapx{flex-wrap:wrap}
 .welcome h1.name{font-size:3.6rem}
+.entry-notice{padding-bottom:calc(env(safe-area-inset-bottom) + 32px)}
+.entry-notice-text{margin:12px 0 18px;padding:14px;border:1px solid rgba(var(--acr),.3);border-radius:14px;background:rgba(var(--acr),.08);white-space:pre-wrap;overflow-wrap:anywhere}
