@@ -1,15 +1,71 @@
-# دو حقیقت و یک دروغ
+# دو دروغ و یک حقیقت
 
-## متغیرهای Vercel (Settings > Environment Variables)
-VITE_SUPABASE_URL=https://fqvxxeikhzwngujgybkn.supabase.co
-VITE_SUPABASE_ANON_KEY=(همون کلید publishable)
-VITE_PIN_ALI=(رمز دلخواه خودت)
-VITE_BOT_USERNAME=something4orus_bot
-SUPABASE_URL=https://fqvxxeikhzwngujgybkn.supabase.co
-SUPABASE_SERVICE_KEY=(Secret key سوپابیس)
-TELEGRAM_BOT_TOKEN=(توکن ربات)
-TELEGRAM_WEBHOOK_SECRET=(یک رشته‌ی دلخواه)
-TELEGRAM_HOST_CHAT_ID=(بعد از /start به ربات)
+نسخه‌ی Vercel-ready با لینک دعوت اختصاصی، نشست امن سمت سرور و اعلان تلگرام.
 
-## وب‌هوک (یک بار در مرورگر)
-https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DOMAIN>/api/telegram&secret_token=<SECRET>
+## 1) آماده‌سازی Supabase
+
+1. از بخش SQL Editor فایل `supabase-migration.sql` را اجرا کن.
+2. این migration جدول‌های فعلی را حذف نمی‌کند و اطلاعات مهمان‌ها، سؤال‌ها و جواب‌ها را نگه می‌دارد.
+3. دسترسی مستقیم `anon` و `authenticated` به جدول‌ها بسته می‌شود. از این نسخه به بعد مرورگر فقط از APIهای سرور استفاده می‌کند.
+4. کلید Service Role فقط باید در Environment Variables سمت سرور باشد؛ هرگز آن را با پیشوند `VITE_` تعریف نکن.
+
+> فایل‌های `supabase.sql` و `supabase-first-time.sql` برای نصب اولیه‌ی قدیمی هستند و جدول‌ها را حذف و دوباره می‌سازند. برای دیتابیس فعلی اجرا نکن.
+
+## 2) متغیرهای Vercel
+
+در Project Settings → Environment Variables این مقادیر را تنظیم کن:
+
+| Variable | توضیح |
+|---|---|
+| `SUPABASE_URL` | آدرس پروژه Supabase |
+| `SUPABASE_SERVICE_KEY` | کلید محرمانه‌ی Service Role / Secret |
+| `HOST_PIN` | رمز ورود میزبان؛ حداقل ۱۲ کاراکتر پیشنهاد می‌شود |
+| `HOST_NAME` | نام میزبان، مثلاً علی |
+| `SESSION_SECRET` | رشته‌ی تصادفی محرمانه با حداقل ۳۲ کاراکتر |
+| `VITE_BOT_USERNAME` | نام کاربری ربات بدون @ |
+| `TELEGRAM_BOT_TOKEN` | توکن ربات تلگرام |
+| `TELEGRAM_WEBHOOK_SECRET` | رشته‌ی تصادفی محرمانه برای وب‌هوک |
+| `TELEGRAM_HOST_CHAT_ID` | شناسه‌ی عددی چت میزبان با ربات |
+
+برای ساخت secret تصادفی می‌توانی از دستور زیر استفاده کنی:
+
+```bash
+openssl rand -hex 32
+```
+
+`VITE_SUPABASE_URL` و `VITE_SUPABASE_ANON_KEY` دیگر در فرانت‌اند استفاده نمی‌شوند.
+
+## 3) اتصال تلگرام
+
+1. ربات را در تلگرام باز کن و `/start` بفرست؛ شناسه‌ی چت را دریافت می‌کنی.
+2. شناسه را در `TELEGRAM_HOST_CHAT_ID` در Vercel قرار بده.
+3. آدرس وب‌هوک را با جایگزین‌کردن مقادیر واقعی تنظیم کن:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://YOUR_DOMAIN/api/telegram","secret_token":"YOUR_TELEGRAM_WEBHOOK_SECRET"}'
+```
+
+4. بعد از Deploy، در پنل میزبان یک مخاطب بساز. برای هر مخاطب دو لینک مجزا داری:
+   - لینک دعوت اختصاصی برای ورود به بازی.
+   - لینک اتصال تلگرام برای فعال‌کردن اعلان‌ها.
+
+اعلان سؤال جدید مهمان و پیام خصوصی به چت میزبان می‌آید. سؤال جدید میزبان به مخاطب‌هایی که ربات را متصل کرده‌اند ارسال می‌شود.
+
+## 4) اجرای پروژه
+
+```bash
+pnpm install
+pnpm build
+```
+
+برای توسعه‌ی محلی همراه با APIهای Vercel از `pnpm dlx vercel dev` استفاده کن؛ اجرای صرف `vite`، مسیرهای `/api/*` را اجرا نمی‌کند. متغیرها را در فایل `.env.local` قرار بده؛ فایل‌های `.env*` به‌جز `.env.example` در Git نادیده گرفته می‌شوند.
+
+## نکات امنیتی
+
+- نشست ورود در کوکی `HttpOnly` و امضاشده‌ی سمت سرور نگه‌داری می‌شود.
+- لینک دعوت هر مخاطب توکن تصادفی اختصاصی دارد؛ تاریخ تولد دیگر روش ورود نیست.
+- دسترسی هر مهمان به داده‌ها در API سمت سرور محدود می‌شود.
+- `HOST_PIN` و `SESSION_SECRET` و کلیدهای Supabase و تلگرام نباید در کد فرانت‌اند یا Git قرار بگیرند.
+- اگر قبلاً فایل `.env` یا کلیدهای محرمانه را در مخزن عمومی قرار داده‌ای، آن کلیدها را از پنل سرویس‌ها Rotate کن.

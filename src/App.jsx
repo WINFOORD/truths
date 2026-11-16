@@ -1,26 +1,14 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {sb} from './supabase'
 
-const HOST_PIN=import.meta.env.VITE_PIN_ALI
 const BOT=import.meta.env.VITE_BOT_USERNAME
 const HOST_NAME='علی'
 const L=['الف','ب','ج']
 const rnd=a=>a[Math.floor(Math.random()*a.length)]
 const buzz=n=>{try{navigator.vibrate&&navigator.vibrate(n||12)}catch(e){}}
-const digits=s=>(s||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim()
-const pad=n=>String(n).padStart(2,'0')
-const MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 const THEMES=[['','طلایی'],['blue','آبی'],['rose','رز'],['violet','بنفش']]
-const dayMax=m=>m<=6?31:30
-const EMPTY={d:'',m:'',y:''}
-const parseDate=s=>{const p=(s||'').split('-');return p.length===3?{d:String(+p[2]),m:String(+p[1]),y:p[0]}:EMPTY}
-const joinDate=v=>{
-  const y=+digits(v.y),m=+v.m,d=+digits(v.d)
-  if(!y||y<1300||y>1450||!m||!d||d>dayMax(m)) return ''
-  return `${y}-${pad(m)}-${pad(d)}`
-}
-const dupMsg=e=>e.code==='23505'?'این تاریخ تولد برای یک نفر دیگر ثبت شده؛ تاریخ هر نفر باید فرق داشته باشد':e.message
-const notify=(type,id)=>fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,id})}).catch(()=>{})
+const dupMsg=e=>e.code==='23505'?'این مخاطب یا شناسه قبلاً ثبت شده است':e.message
+const notify=async(type,id)=>{try{const r=await fetch('/api/notify',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,id})});return await r.json().catch(()=>({ok:false,sent:false}))}catch{return {ok:false,sent:false}}}
 
 const P={
   play:'M7 4.8v14.4a1 1 0 001.5.86l11.6-7.2a1 1 0 000-1.72L8.5 3.94A1 1 0 007 4.8z',
@@ -86,6 +74,7 @@ function advise(f){
 const WIN=['دقیقاً همین بود 🎯','چه حدس خوبی 😏','ذهنت تیز است ⚡','داری منو می‌خونی 👀']
 const LOSE=['گول خوردی 😈','نزدیک بودی 🙈','سخت بود، قبول 😅']
 const BAD=['نه، دوباره فکر کن 😏','هنوز نه! تو که یادته ','اینقدرها هم سخت نیست 🙃']
+const DEMO_Q={id:'demo',prompt:'ببین چقدر خوب می‌تونی حدس بزنی؟',statements:['یک بار تا صبح کنار دریا بیدار ماندم.','صدای باران کمکم می‌کند راحت‌تر بخوابم.','هیچ‌وقت بستنی شکلاتی نخورده‌ام.'],truth_index:1,story:'این یکی واقعاً به سلیقه‌ی آدم بستگی دارد؛ مهم این است که از روی جزئیات حدس بزنی، نه عجیب‌بودن جمله‌ها.'}
 
 function useType(text,speed=16){
   const [o,setO]=useState('')
@@ -103,42 +92,46 @@ function Tip({k}){
   return <div className="tip rise"><div>{HELP[k].map((t,i)=><div key={i} className={i?'':'t1'}>{t}</div>)}</div><button onClick={()=>{localStorage.setItem('tip_'+k,'1');setOn(false)}}>فهمیدم</button></div>
 }
 
-function DateInput({v,set,onEnter}){
-  const up=k=>e=>set({...v,[k]:e.target.value})
-  return(
-    <div className="dob">
-      <input className="inp" type="tel" inputMode="numeric" maxLength={2} placeholder="روز" value={v.d} onChange={up('d')}/>
-      <select className="inp" value={v.m} onChange={up('m')}>
-        <option value="">ماه</option>
-        {MONTHS.map((x,i)=><option key={i} value={i+1}>{x}</option>)}
-      </select>
-      <input className="inp" type="tel" inputMode="numeric" maxLength={4} placeholder="سال" value={v.y} onChange={up('y')} onKeyDown={e=>e.key==='Enter'&&onEnter&&onEnter()}/>
-    </div>
-  )
-}
-
 export default function App(){
-  const [sess,setSess]=useState(()=>{try{return JSON.parse(localStorage.getItem('sess'))}catch(e){return null}})
+  const [sess,setSess]=useState(null)
+  const [authReady,setAuthReady]=useState(false)
   const [tab,setTab]=useState('play'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState(''),[secret,setSecret]=useState(false)
   const [view,setViewS]=useState(()=>localStorage.getItem('view')||'')
   const taps=useRef({n:0,t:0})
   const say=m=>{setToast(m);setTimeout(()=>setToast(''),2600)}
-  const save=s=>{localStorage.setItem('sess',JSON.stringify(s));setSess(s)}
-  const logout=()=>{localStorage.removeItem('sess');setSess(null);setTab('play');setEdit(null)}
+  const save=s=>setSess(s)
+  const logout=()=>{fetch('/api/auth',{method:'DELETE',credentials:'same-origin'}).catch(()=>{});localStorage.removeItem('sess');setSess(null);setTab('play');setEdit(null)}
   const setView=id=>{localStorage.setItem('view',id);setViewS(id)}
   const go=t=>{if(t!=='write')setEdit(null);setTab(t)}
   const help=()=>{Object.keys(localStorage).filter(k=>k.startsWith('tip_')).forEach(k=>localStorage.removeItem(k));setNonce(n=>n+1);say('راهنما دوباره نشون داده شد 💡')}
 
+  useEffect(()=>{
+    let alive=true
+    const invite=new URLSearchParams(location.search).get('invite')
+    const validate=async()=>{
+      if(invite){await fetch('/api/auth',{method:'DELETE',credentials:'same-origin'}).catch(()=>{});if(alive)setSess(null);return}
+      const response=await fetch('/api/auth',{credentials:'same-origin'})
+      const data=await response.json().catch(()=>({}))
+      if(!alive)return
+      if(response.ok&&data.session)setSess(data.session)
+      else setSess(null)
+    }
+    validate().catch(()=>{if(alive)setSess(null)}).finally(()=>{if(alive)setAuthReady(true)})
+    return()=>{alive=false}
+  },[])
   useEffect(()=>{document.documentElement.dataset.theme=sess?.theme||''},[sess?.theme])
   useEffect(()=>{
     if(sess?.role!=='guest') return
+    let alive=true
     sb.from('guests').select('id,name,slug,theme,notes').eq('id',sess.id).maybeSingle().then(({data,error})=>{
-      if(error) return
-      if(!data) return logout()
+      if(!alive||error)return
+      if(!data)return logout()
       save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||''})
     })
-  },[])
+    return()=>{alive=false}
+  },[sess?.id])
 
+  if(!authReady) return <><Bg/><div className="app login"><div className="skel"/></div></>
   if(!sess) return <><Bg/><Login onOk={save}/></>
   const host=sess.role==='host'
   const tapAv=()=>{
@@ -186,50 +179,60 @@ function Secret({sess,onClose}){
 
 function Login({onOk}){
   const [host,setHost]=useState(false),[pin,setPin]=useState('')
-  const [v,setV]=useState(EMPTY)
   const [bad,setBad]=useState(''),[bk,setBk]=useState(0),[busy,setBusy]=useState(false),[hi,setHi]=useState(null)
+  const invite=new URLSearchParams(location.search).get('invite')||''
   const fail=t=>{setBad(t);setBk(b=>b+1);buzz(40);setBusy(false)}
-  const enter=async()=>{
-    if(busy) return
-    if(host){
-      if(!HOST_PIN||pin===HOST_PIN) return onOk({role:'host',name:HOST_NAME})
-      return fail(rnd(BAD))
-    }
-    const s=joinDate(v)
-    if(!s) return fail('تاریخ تولدت رو کامل و درست وارد کن 🎂')
+  const guestEnter=async token=>{
+    if(busy)return
     setBusy(true);setBad('')
-    const {data,error}=await sb.rpc('guest_login',{p:s})
-    const g=data&&data[0]
-    if(error||!g) return fail(rnd(BAD))
-    buzz([20,40,20])
-    document.documentElement.dataset.theme=g.theme||''
-    setHi(g)
-    setTimeout(()=>onOk({role:'guest',id:g.id,name:g.name,slug:g.slug,theme:g.theme||'',notes:g.notes||''}),3200)
+    try{
+      const response=await fetch('/api/auth',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'guest',invite:token})})
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok||!result.session) return fail(result.error||'لینک دعوت معتبر نیست')
+      const session=result.session
+      buzz([20,40,20]);document.documentElement.dataset.theme=session.theme||''
+      setHi(session)
+      history.replaceState({},'',location.pathname)
+      setTimeout(()=>onOk(session),2600)
+    }catch{fail('ارتباط با سرور برقرار نشد؛ دوباره تلاش کن')}
+  }
+  useEffect(()=>{if(invite)guestEnter(invite)},[])
+  const enter=async()=>{
+    if(busy)return
+    if(!pin.trim())return fail('رمز میزبان رو وارد کن')
+    setBusy(true);setBad('')
+    try{
+      const response=await fetch('/api/auth',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'host',pin})})
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok||!result.session)return fail(result.error||'ورود انجام نشد')
+      onOk(result.session)
+    }catch{fail('ارتباط با سرور برقرار نشد؛ دوباره تلاش کن')}
   }
   if(hi) return(
     <div className="app login welcome">
       <Confetti n={70}/><div className="glow"/>
+      <div className="eyebrow rise">این لحظه برای توئه</div>
       <h1 className="name rise">{hi.name}</h1>
       <p className="lead rise" style={{'--d':2}}>خوش اومدی ✨</p>
+      <p className="lead rise" style={{'--d':3}}>یه بازی کوچیک، با چندتا چیز که فقط تو می‌فهمی.</p>
     </div>
   )
+  if(invite&&busy) return <div className="app login"><div className="glow"/><div className="ring soft">✦</div><p className="lead">دارم در رو برات باز می‌کنم…</p></div>
   return(
     <div className="app login">
-      <div className="eyebrow rise">{host?'میزبان':'دو دروغ و یک حقیقت'}</div>
+      <div className="eyebrow rise">{host?'ورود میزبان':'دو دروغ و یک حقیقت'}</div>
       {!host&&<>
-        <h1 className="who big rise" style={{'--d':1}}>این بازی فقط برای یک نفر ساخته شده </h1>
-        <p className="lead small rise" style={{'--d':2}}>اگه خودشی، تاریخ تولدت رو بگو.</p>
-        <div key={bk} className={'rise'+(bad?' bad':'')} style={{'--d':3,width:'100%'}}>
-          <DateInput v={v} set={setV} onEnter={enter}/>
-        </div>
+        <div className="ring soft rise">✦</div>
+        <h1 className="who big rise" style={{'--d':1}}>این بازی با لینک اختصاصی تو شروع می‌شه</h1>
+        <p className="lead small rise" style={{'--d':2}}>از کسی که دعوتت کرده لینک مخصوص خودت رو بگیر.</p>
       </>}
       {host&&<>
-        <h1 className="who big">سلام علی 👋</h1>
-        <input key={bk} className={'pin'+(bad?' bad':'')} type="password" placeholder="رمز" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&enter()}/>
+        <h1 className="who big">ورود میزبان</h1>
+        <input key={bk} className={'pin'+(bad?' bad':'')} type="password" autoComplete="current-password" placeholder="رمز میزبان" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&enter()}/>
       </>}
       {bad&&<p className="red mt">{bad}</p>}
-      <button className="btn big" disabled={busy} onClick={enter}>{host?'ورود':'ورود'}</button>
-      <button className="link faint" onClick={()=>{setHost(!host);setBad('');setPin('')}}>{host?'بازگشت':'میزبان'}</button>
+      {host&&<button className="btn big" disabled={busy} onClick={enter}>{busy?'یک لحظه…':'ورود'}</button>}
+      <button className="link faint" onClick={()=>{setHost(!host);setBad('');setPin('')}}>{host?'بازگشت':'ورود میزبان'}</button>
     </div>
   )
 }
@@ -250,17 +253,17 @@ function Write({sess,edit,onSaved,say}){
   const save=async()=>{
     setBusy(true)
     const row={prompt:f.prompt.trim(),statements:f.s.map(x=>x.trim()),truth_index:f.truth,story:f.story.trim()}
-    let error
+    let error,notificationSent=true
     if(edit){
       const r=await sb.from('questions').update(row).eq('id',edit.id);error=r.error
       if(!error) await sb.from('answers').delete().eq('question_id',edit.id)
     }else{
       const r=await sb.from('questions').insert({...row,owner:host?'host':'guest',guest_id:host?null:sess.id,notified:false}).select('id').single()
-      error=r.error;if(!error) notify('question',r.data.id)
+      error=r.error;if(!error){const notice=await notify('question',r.data.id);notificationSent=!!notice?.sent} 
     }
     setBusy(false)
     if(error) return say(error.message)
-    say(edit?'ویرایش شد ✅':'ذخیره شد 🎉');onSaved(!!edit)
+    say(edit?'ویرایش شد ✅':notificationSent?'ذخیره شد 🎉':'سؤال ذخیره شد؛ اعلان تلگرام ارسال نشد. اتصال ربات را بررسی کن.');onSaved(!!edit)
   }
   const titles=['موضوع رو انتخاب کن 🎯','سه جمله؛ یکی حقیقت، دو تا دروغ 🎭','داستانش رو بگو 📖']
   return(
@@ -374,7 +377,7 @@ function MsgSheet({sess,say,onClose}){
     const {data,error}=await sb.from('messages').insert({guest_id:sess.id,body:t.trim()}).select('id').single()
     setBusy(false)
     if(error) return say(error.message)
-    notify('message',data.id);say('پیامت رسید 💌');onClose()
+    const notice=await notify('message',data.id);say(notice?.sent?'پیامت رسید 💌':'پیامت ثبت شد، اما اعلان تلگرام ارسال نشد. اتصال ربات را بررسی کن.');onClose()
   }
   return(
     <div className="scrim" onClick={onClose}><div className="sheet" onClick={e=>e.stopPropagation()}>
@@ -405,32 +408,30 @@ function ThemePick({v,set}){
 }
 
 function GuestCard({g,active,onView,say,reload,copy}){
-  const [name,setName]=useState(g.name),[v,setV]=useState(parseDate(g.secret)),[theme,setTheme]=useState(g.theme||''),[notes,setNotes]=useState(g.notes||''),[sure,setSure]=useState(false)
-  const sec=joinDate(v)
-  const dirty=name.trim()!==g.name||sec!==g.secret||theme!==(g.theme||'')||notes!==(g.notes||'')
+  const [name,setName]=useState(g.name),[theme,setTheme]=useState(g.theme||''),[notes,setNotes]=useState(g.notes||''),[sure,setSure]=useState(false)
+  const dirty=name.trim()!==g.name||theme!==(g.theme||'')||notes!==(g.notes||'')
   const save=async()=>{
-    if(!name.trim()) return say('اسم را بنویس')
-    if(!sec) return say('تاریخ تولد کامل و درست نیست')
-    const {error}=await sb.from('guests').update({name:name.trim(),secret:sec,theme,notes}).eq('id',g.id)
-    if(error) return say(dupMsg(error))
+    if(!name.trim())return say('اسم را بنویس')
+    const {error}=await sb.from('guests').update({name:name.trim(),theme,notes}).eq('id',g.id)
+    if(error)return say(error.message)
     say('ذخیره شد ✅');reload()
   }
-  const del=async()=>{await sb.from('guests').delete().eq('id',g.id);reload()}
+  const del=async()=>{const {error}=await sb.from('guests').delete().eq('id',g.id);if(error)return say(error.message);reload()}
+  const inviteUrl=`${location.origin}/?invite=${g.invite_token}`
   return(
     <div className={'gbox'+(active?' act':'')}>
       <input className="field s" placeholder="اسم" value={name} onChange={e=>setName(e.target.value)}/>
-      <div className="gap"/>
-      <DateInput v={v} set={setV}/>
-      <ThemePick v={theme} set={setTheme}/>
+      <div className="gap"/><ThemePick v={theme} set={setTheme}/>
       <details className="more">
         <summary>یادداشت یواشکی</summary>
-        <textarea className="field" placeholder={'هر خط یک پیام:\nعلی: ...\nیسنا: ...'} value={notes} onChange={e=>setNotes(e.target.value)}/>
-        <p className="sub">این‌ها فقط وقتی نشان داده می‌شود که او ۵ بار پشت‌سرهم روی دایره‌ی اسمش (بالا) بزند.</p>
+        <textarea className="field" placeholder={`هر خط یک پیام:\nعلی: ...\nنام مخاطب: ...`} value={notes} onChange={e=>setNotes(e.target.value)}/>
+        <p className="sub">این یادداشت بعد از ورود، با پنج بار لمس آواتار بالای صفحه برای مخاطب آشکار می‌شود.</p>
       </details>
       <div className="tgs">{g.chat_id?'🔔 تلگرام متصل'+(g.tg_username?' · @'+g.tg_username:''):'🔕 تلگرام متصل نیست'}</div>
       <div className="acts wrapx">
         <button className={'mini'+(active?' gold':'')} onClick={onView}>{active?'✓ سؤال‌هایش در بازی':'سؤال‌هایش را بیاور'}</button>
-        {BOT&&<button className="mini" onClick={()=>copy(`https://t.me/${BOT}?start=${g.slug}`,'لینک ربات کپی شد 🔔')}><Ic n="copy" s={14}/> لینک ربات</button>}
+        <button className="mini" onClick={()=>copy(inviteUrl,'لینک اختصاصی کپی شد 🔗')}><Ic n="copy" s={14}/> لینک دعوت</button>
+        {BOT&&<button className="mini" onClick={()=>copy(`https://t.me/${BOT}?start=${g.slug}`,'لینک اتصال تلگرام کپی شد 🔔')}><Ic n="copy" s={14}/> اتصال تلگرام</button>}
         {sure?<button className="mini red" onClick={del}>مطمئنی؟</button>:<button className="mini red" onClick={()=>setSure(true)}><Ic n="trash" s={14}/></button>}
       </div>
       {dirty&&<button className="btn big" onClick={save}>ذخیره‌ی تغییرات</button>}
@@ -439,17 +440,15 @@ function GuestCard({g,active,onView,say,reload,copy}){
 }
 
 function Guests({say,onClose,view,setView}){
-  const [gs,setGs]=useState(null),[nm,setNm]=useState(''),[v,setV]=useState(EMPTY),[theme,setTheme]=useState('')
+  const [gs,setGs]=useState(null),[nm,setNm]=useState(''),[theme,setTheme]=useState('')
   const load=async()=>{const {data}=await sb.from('guests').select('*').order('created_at');setGs(data||[])}
   useEffect(()=>{load()},[])
   const copy=async(txt,m)=>{try{await navigator.clipboard.writeText(txt);say(m)}catch(e){say(txt)}}
   const add=async()=>{
     if(!nm.trim()) return say('اسم را بنویس')
-    const sec=joinDate(v)
-    if(!sec) return say('تاریخ تولد را کامل و درست وارد کن (روز، ماه، سال)')
-    const {error}=await sb.from('guests').insert({name:nm.trim(),secret:sec,theme,slug:Math.random().toString(36).slice(2,8)})
+    const {error}=await sb.from('guests').insert({name:nm.trim(),theme,slug:crypto.randomUUID().replaceAll('-',''),invite_token:crypto.randomUUID().replaceAll('-','')})
     if(error) return say(dupMsg(error))
-    setNm('');setV(EMPTY);setTheme('');load();say('اضافه شد ✅')
+    setNm('');setTheme('');load();say('اضافه شد ✅')
   }
   const shown=gs&&gs.length?(gs.find(g=>g.id===view)||gs[0]).id:null
   return(
@@ -458,12 +457,12 @@ function Guests({say,onClose,view,setView}){
       <div className="how">
         <b>چطور کاربر اضافه کنم؟</b>
         <ol>
-          <li>پایین همین صفحه اسم و تاریخ تولد کامل (روز، ماه، سال شمسی) را بنویس و «افزودن» را بزن.</li>
-          <li>همه یک لینک دارند: لینک سایت. دکمه‌ی زیر را بزن و برایش بفرست.</li>
-          <li>او فقط تاریخ تولدش را می‌زند؛ اگر درست بود با اسم خودش خوش‌آمد می‌شنود و وارد می‌شود.</li>
-          <li>تاریخ تولد دو نفر نباید یکی باشد، چون ورود فقط با همین انجام می‌شود.</li>
+          <li>اسم مخاطب را وارد کن و «افزودن» را بزن.</li>
+          <li>برای هر نفر یک لینک دعوت اختصاصی ساخته می‌شود؛ همان لینک را برای خودش بفرست.</li>
+          <li>با باز کردن لینک، صفحه با اسم و تم مخصوص خودش باز می‌شود؛ نیازی به تاریخ تولد یا رمز مشترک ندارد.</li>
+          <li>برای اعلان تلگرام، لینک اتصال تلگرام را هم جداگانه برایش بفرست.</li>
         </ol>
-        <button className="mini gold" onClick={()=>copy(location.origin,'لینک سایت کپی شد 🔗')}><Ic n="copy" s={14}/> کپی لینک سایت</button>
+        <span className="sub">هر مخاطب لینک دعوت جداگانه دارد.</span>
       </div>
       <p className="sub">وقتی بازی می‌کنی، سؤال‌های مخاطبی که «در بازی» علامت دارد می‌آید.</p>
       {!gs&&<div className="skel"/>}
@@ -473,7 +472,6 @@ function Guests({say,onClose,view,setView}){
         <div className="gap"/>
         <input className="field s" placeholder="اسم" value={nm} onChange={e=>setNm(e.target.value)}/>
         <div className="gap"/>
-        <DateInput v={v} set={setV} onEnter={add}/>
         <ThemePick v={theme} set={setTheme}/>
         <button className="btn big" onClick={add}>افزودن</button>
       </div>
@@ -506,7 +504,7 @@ function Pick({q,onDone}){
 function Play({sess,view}){
   const host=sess.role==='host',me=host?'host':sess.id
   const [guests,setGuests]=useState(host?null:[])
-  const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0)
+  const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[isDemo,setIsDemo]=useState(false)
   useEffect(()=>{
     if(!host) return
     sb.from('guests').select('id,name').order('created_at').then(({data})=>setGuests(data||[]))
@@ -518,7 +516,7 @@ function Play({sess,view}){
     if(wait) return
     if(host&&!gid){setQs([]);return}
     let alive=true
-    setQs(null);setI(0);setRes(null);setScore(0);setStreak(0)
+    setQs(null);setI(0);setRes(null);setScore(0);setStreak(0);setIsDemo(false)
     ;(async()=>{
       let q=sb.from('questions').select('*, answers(responder)').order('created_at')
       q=host?q.eq('owner','guest').eq('guest_id',gid):q.eq('owner','host')
@@ -528,15 +526,15 @@ function Play({sess,view}){
     return()=>{alive=false}
   },[wait,gid])
   if(!qs) return <div className="skel"/>
-  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p></div>
+  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p><button className="btn big" onClick={()=>{setQs([DEMO_Q]);setIsDemo(true);setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور آزمایشی بازی کنیم 🎲</button></div>
   if(i>=qs.length){
-    const good=score>=Math.ceil(qs.length/2)
-    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'باید بیشتر حرف بزنید ☕'}</h2><p className="sub">بعد از دیت، یه دور دیگه بازی کنید.</p></div></>
+    const good=score>=Math.ceil(qs.length/2),target=host?(gname||'مخاطبت'):'علی'
+    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p><button className="btn big" onClick={()=>{setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور دیگه 🔁</button>{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
   }
   const q=qs[i]
   const done=lies=>{
     const correct=[0,1,2].filter(x=>x!==q.truth_index).every(x=>lies.includes(x))
-    sb.from('answers').insert({question_id:q.id,responder:me,picked_lies:lies,correct}).then(()=>{})
+    if(!isDemo) sb.from('answers').insert({question_id:q.id,responder:me,picked_lies:lies,correct}).then(({error})=>{if(error)console.error('answer save failed',error)})
     if(correct){setScore(s=>s+1);setStreak(s=>s+1);buzz([20,40,20])}else{setStreak(0);buzz(60)}
     setRes({correct,word:rnd(correct?WIN:LOSE),lies})
   }
