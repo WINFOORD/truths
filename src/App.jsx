@@ -288,7 +288,7 @@ function Write({sess,edit,onSaved,say}){
     }
     setBusy(false)
     if(error) return say(error.message)
-    say(edit?'ویرایش شد ✅':notificationSent?'ذخیره شد 🎉':'سؤال ذخیره شد؛ اعلان تلگرام ارسال نشد. اتصال ربات را بررسی کن.');onSaved(!!edit)
+    say(edit?'ویرایش شد ✅':notificationSent?'ذخیره شد 🎉':'سؤال ذخیره شد؛ ');onSaved(!!edit)
   }
   const titles=['موضوع رو انتخاب کن 🎯','سه جمله؛ یکی حقیقت، دو تا دروغ 🎭','داستانش رو بگو 📖']
   return(
@@ -407,7 +407,7 @@ function MsgSheet({sess,say,onClose}){
     const {data,error}=await sb.from('messages').insert({guest_id:sess.id,body:t.trim()}).select('id').single()
     setBusy(false)
     if(error) return say(error.message)
-    const notice=await notify('message',data.id);say(notice?.sent?'پیامت رسید 💌':'پیامت ثبت شد، اما اعلان تلگرام ارسال نشد. اتصال ربات را بررسی کن.');onClose()
+    const notice=await notify('message',data.id);say(notice?.sent?'پیامت رسید 💌':'پیامت ثبت شد');onClose()
   }
   return(
     <div className="scrim" onClick={onClose}><div className="sheet" onClick={e=>e.stopPropagation()}>
@@ -563,10 +563,10 @@ function Play({sess,view}){
     })
   },[host,qs])
   if(!qs) return <div className="skel"/>
-  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد.'}</p>}<button className="btn big" onClick={()=>{setQs([DEMO_Q]);setIsDemo(true);setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور آزمایشی بازی کنیم {qs}🎲</button></div>
+  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد.'}</p>}</div>
   if(i>=qs.length){
     const good=score>=Math.ceil(qs.length/2),target=host?(gname||'مخاطبت'):'علی'
-    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد؛ بعداً دوباره تلاش می‌کنیم.'}</p>}<button className="btn big" onClick={()=>{setI(0);setRes(null);setScore(0);setStreak(0)}}>یک دور دیگه 🔁</button>{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
+    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد؛ بعداً دوباره تلاش می‌کنیم.'}</p>}{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
   }
   const q=qs[i]
   const done=async lies=>{
