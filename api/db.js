@@ -32,6 +32,11 @@ export default async function handler(req, res) {
     if (table === 'questions' && !['select', 'insert', 'update', 'delete'].includes(action)) return res.status(403).json({ error: 'دسترسی مجاز نیست' })
     if (table === 'answers' && !['select', 'insert', 'delete'].includes(action)) return res.status(403).json({ error: 'دسترسی مجاز نیست' })
   }
+  if (!host && (table === 'questions' || table === 'answers')) {
+    const { data: g } = await db.from('guests').select('features').eq('id', session.id).maybeSingle()
+    if (!g) return res.status(401).json({ error: 'نشست معتبر نیست' })
+    if (g.features && g.features.game === false) return res.status(403).json({ error: 'این بخش برای تو فعال نیست' })
+  }
   try {
     let query
     if (action === 'select') query = db.from(table).select(columns)
@@ -80,7 +85,7 @@ export default async function handler(req, res) {
           if (ownerFilter === 'guest') query = query.eq('guest_id', session.id)
           else if (ownerFilter !== 'host') query = query.eq('guest_id', session.id)
           if (ownerFilter !== 'guest') query = query.eq('owner', 'host')
-          query = query.eq('answers.responder', session.id)
+          if (ownerFilter !== 'guest') query = query.eq('answers.responder', session.id)
         } else if (['update', 'delete'].includes(action)) {
           query = query.eq('owner', 'guest').eq('guest_id', session.id)
         }

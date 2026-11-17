@@ -1,11 +1,11 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import {sb} from './supabase'
+import {Ic,buzz,rnd} from './ui.jsx'
+import {Home,Tot,DateTab} from './Features.jsx'
 
 const BOT=import.meta.env.VITE_BOT_USERNAME
 const HOST_NAME='علی'
 const L=['الف','ب','ج']
-const rnd=a=>a[Math.floor(Math.random()*a.length)]
-const buzz=n=>{try{navigator.vibrate&&navigator.vibrate(n||12)}catch(e){}}
 const noteText=value=>{
   const text=typeof value==='string'?value.trim():''
   return text.length>=2&&text.startsWith('"')&&text.endsWith('"')?text.slice(1,-1):text
@@ -14,37 +14,26 @@ const THEMES=[['','طلایی'],['blue','آبی'],['rose','رز'],['violet','ب�
 const dupMsg=e=>e.code==='23505'?'این مخاطب یا شناسه قبلاً ثبت شده است':e.message
 const notify=async(type,id)=>{try{const r=await fetch('/api/notify',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,id})});return await r.json().catch(()=>({ok:false,sent:false}))}catch{return {ok:false,sent:false}}}
 
-const P={
-  play:'M7 4.8v14.4a1 1 0 001.5.86l11.6-7.2a1 1 0 000-1.72L8.5 3.94A1 1 0 007 4.8z',
-  pen:'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z',
-  user:'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0',
-  spark:'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z',
-  trash:'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
-  check:'M5 12.5l4.5 4.5L19 7',
-  x:'M6 6l12 12M18 6L6 18',
-  refresh:'M20 12a8 8 0 11-2.4-5.7M20 4v5h-5',
-  out:'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h9',
-  copy:'M9 9h11v11H9zM5 15V5h10',
-  gear:'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z',
-  help:'M9.5 9a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.3M12 17h.01'
-}
-const Ic=({n,s=22})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={P[n]}/></svg>
 
 const IDEAS=[
-  {e:'🧸',c:'گذشته',p:'یک خاطره‌ی بچگی',h:'یک جزئیات دقیق مثل اسم یا مکان بگو؛ همین باورپذیرش می‌کند.',ex:'هفت‌ساله بودم که وسط بازار گم شدم.',lies:['بچه بودم با دوچرخه تا شهر بغلی رفتم.','در بچگی یک لاک‌پشت داشتم به اسم ناصرالدین.','کلاس اول سر کلاس خوابم برد و معلم نفهمید.','یک بار توی پارک یک سنجاب دنبالم کرد.']},
-  {e:'🎻',c:'استعداد',p:'یک مهارت یا ساز',h:'مهارتی که کسی انتظارش را ندارد، هم بهترین حقیقت است هم بهترین دروغ.',ex:'می‌توانم سه‌تار بزنم.',lies:['می‌توانم با پا نقاشی بکشم.','سه سال پیانو یاد گرفتم و ولش کردم.','یک بار در یک مسابقه‌ی استعدادیابی شرکت کردم.','می‌توانم سه توپ را هم‌زمان در هوا نگه دارم.']},
-  {e:'🧳',c:'سفر',p:'جایی که رفته‌ای',h:'جایی را انتخاب کن که یک داستان کوتاه ازش داری.',ex:'یک شب را توی ایستگاه قطار خوابیدم.',lies:['یک بار تنهایی رفتم کوه و راه را گم کردم.','دو هفته در روستایی بدون اینترنت زندگی کردم.','یک بار با اتوبوس اشتباهی رفتم شهر دیگر.','تنهایی رفته‌ام سفر خارجی.']},
-  {e:'🙈',c:'قرار',p:'یک لحظه‌ی خجالت‌آور سر قرار',h:'کمی خودمانی بودن حس صمیمیت می‌دهد.',ex:'یک بار اسم طرف مقابل را اشتباه صدا زدم.',lies:['یک بار قهوه‌ام را روی خودم ریختم.','یک بار قرار را فراموش کردم و دیر رسیدم.','یک بار رستوران را اشتباه رفتم.','یک بار سر قرار شارژ گوشی‌ام تمام شد و گم شدم.']},
-  {e:'🍕',c:'غذا',p:'یک سلیقه‌ی غذایی',h:'سلیقه‌های عجیب خیلی راحت بحث باز می‌کنند.',ex:'پیتزای آناناسی را دوست دارم.',lies:['هیچ‌وقت سوشی نخورده‌ام.','قهوه را بی‌شکر می‌خورم.','صبحانه را بیشتر از شام دوست دارم.','از شکلات متنفرم.']},
-  {e:'🕷️',c:'ترس',p:'یک ترس کوچک',h:'ترس‌های بامزه بهتر از ترس‌های جدی‌اند.',ex:'از سوسک بیشتر از ارتفاع می‌ترسم.',lies:['از تاریکی می‌ترسم.','از آسانسور می‌ترسم.','از عروسک‌ها می‌ترسم.','از صحبت جلوی جمع می‌ترسم.']},
-  {e:'🌙',c:'رؤیا',p:'یک رؤیای نیمه‌تمام',h:'اینجا می‌توانی کمی عمیق‌تر شوی.',ex:'می‌خواهم یک روز کافه‌کتاب باز کنم.',lies:['می‌خواهم یک روز دور دنیا سفر کنم.','می‌خواهم یک کتاب بنویسم.','می‌خواهم یک روز در یک جزیره زندگی کنم.','می‌خواهم یک خانه‌ی چوبی در جنگل بسازم.']},
-  {e:'🌀',c:'عادت',p:'یک عادت عجیب',h:'عادت‌های کوچک شخصیت را نشان می‌دهند.',ex:'قبل خواب یک آهنگ را چند بار گوش می‌دهم.',lies:['با خودم بلند حرف می‌زنم.','هر صبح اول یک لیوان آب می‌خورم.','وقتی استرس دارم ناخنم را می‌جوم.','هر شب قبل خواب گوشی‌ام را چند بار چک می‌کنم.']}
+  {e:'🙈',c:'سوتی',p:'ضایع‌ترین سوتی من',h:'یه اتفاق واقعی انتخاب کن که تعریف کردنش هم خنده‌داره؛ دروغ‌ها رو هم باورپذیر بنویس.',ex:'یه بار برای کسی دست تکون دادم که اصلاً منو نمی‌شناخت.',lies:['یه بار اسم همکارم رو سه بار پشت سر هم اشتباه گفتم.','وسط حرف زدن یادم رفت داشتم چی می‌گفتم.','برای کسی دست تکون دادم و بعد فهمیدم پشت سرم بوده.','یه بار با اعتمادبه‌نفس وارد کلاس اشتباهی شدم.']},
+  {e:'🛋️',c:'تنبلی',p:'کاری که از شدت تنبلی کردم',h:'از آن تنبلی‌هایی بگو که خودت هم باورت نمی‌شه.',ex:'برای اینکه از جام بلند نشم، شام رو با بیسکویت سر کردم.',lies:['سه ساعت دنبال کنترل تلویزیون گشتم درحالی‌که دستم بود.','برای جواب ندادن به زنگ، وانمود کردم خوابم.','لباس تمیز نداشتم و لباس رو پشت‌ورو پوشیدم.','برای برداشتن شارژر، یک ساعت گوشی رو روی ۲ درصد نگه داشتم.']},
+  {e:'🏫',c:'مدرسه',p:'شیطنت دوران مدرسه',h:'یک خاطره مدرسه‌ای که هنوزم خنده‌داره.',ex:'یه بار تکلیف دوستم رو به اسم خودم تحویل دادم و معلم از خودش تعریف کرد.',lies:['یه بار از پنجره کلاس فرار کردم.','به‌خاطر خنده از کلاس بیرونم کردن.','یک امتحان رو با اسم اشتباه نوشتم.','یه بار زنگ تفریح رفتم کلاس دیگه و تا آخر زنگ نفهمیدن.']},
+  {e:'🍟',c:'غذا',p:'ترکیب غذایی عجیب',h:'ترکیبی که بقیه با شنیدنش می‌گن واقعاً؟',ex:'سیب‌زمینی سرخ‌کرده رو با بستنی می‌خورم.',lies:['ماکارونی رو با ماست و مربا امتحان کردم.','خیارشور رو با شکلات خوردم.','پیتزا رو با عسل دوست دارم.','یه بار چای رو با آب‌لیمو و نمک خوردم.']},
+  {e:'💘',c:'قرار',p:'اتفاق عجیب سر قرار',h:'یک خاطره بامزه و سبک؛ لازم نیست چیزی خیلی خصوصی باشه.',ex:'یه بار توی قرار، اسم طرف رو با اسم یکی دیگه صدا زدم.',lies:['یه بار آدرس رو اشتباه رفتم و سر قرار دیگه‌ای نشستم.','یه بار از شدت استرس نوشیدنی رو برعکس گرفتم.','یه بار تمام قرار درباره فیلمی حرف زدم که ندیده بودم.','یه بار وسط قرار فهمیدم لباسمو پشت‌ورو پوشیدم.']},
+  {e:'😱',c:'ترس',p:'ترس کاملاً بی‌منطق من',h:'ترس کوچیکی که احتمالاً بقیه بهش می‌خندن.',ex:'از بادکنک وقتی می‌ترکه بیشتر از هرچیزی می‌ترسم.',lies:['از عروسک‌های ویترینی می‌ترسم.','وقتی زودپز صدا می‌ده از آشپزخونه می‌رم بیرون.','از صدای نوتیفیکیشن ناشناس می‌ترسم.','از ماهی زنده بیشتر از مار می‌ترسم.']},
+  {e:'🛍️',c:'خرید',p:'افتضاح‌ترین خرید من',h:'خریدی که بعدش با خودت گفتی چرا؟',ex:'یه وسیله خریدم که هنوز نمی‌دونم دقیقاً به چه دردی می‌خوره.',lies:['یه کفش خریدم که دو سایز کوچیک بود.','یه وسیله برقی خریدم و هیچ‌وقت از جعبه درش نیاوردم.','برای ارزون‌تر خریدن، بیشتر از قیمتش هزینه رفت‌وآمد دادم.','یه لباس خریدم فقط چون فروشنده گفت بهم میاد.']},
+  {e:'🧳',c:'سفر',p:'خرابکاری وسط سفر',h:'یک ماجرای واقعی که سفر رو به خاطره تبدیل کرد.',ex:'یه بار توی سفر مسیر برگشت رو اشتباه رفتم و سر از شهر دیگه درآوردم.',lies:['چمدونم رو با چمدون یک نفر دیگه عوض کردم.','یه شب توی ایستگاه قطار خوابم برد.','توی سفر گوشی رو توی یخچال جا گذاشتم.','برای پیدا کردن هتل، سه بار دور یک خیابون چرخیدم.']},
+  {e:'🌀',c:'عادت',p:'عادت عجیب و غریب من',h:'عادت کوچیکی که وقتی بقیه بفهمن احتمالاً مسخره‌ات می‌کنن.',ex:'قبل از خواب چند بار آلارم گوشیم رو چک می‌کنم، با اینکه مطمئنم تنظیمه.',lies:['با خودم بحث می‌کنم و آخرش خودم رو قانع می‌کنم.','وقتی تنها هستم برای وسایلم اسم می‌ذارم.','قبل از فرستادن پیام، چند بار با صدای بلند می‌خونمش.','برای شروع کار، اول باید میزمو کاملاً مرتب کنم.']},
+  {e:'🤥',c:'دروغ بچگی',p:'دروغی که بچگی گفتم',h:'دروغ کوچیک و بامزه‌ای که احتمالاً خیلی‌ها تجربه کردن.',ex:'بچگی گفتم تکلیفم رو خورده سگ، درحالی‌که اصلاً سگ نداشتیم.',lies:['گفتم معلم گفته فردا مدرسه تعطیله.','گفتم خودم بلدم دوچرخه رو تعمیر کنم.','گفتم گربه همسایه مال خودمونه.','گفتم پول رو پیدا کردم، درحالی‌که از قلکم برداشته بودم.']},
+  {e:'🎭',c:'استعداد مخفی',p:'مهارتی که کسی ازم انتظار نداره',h:'یه توانایی عجیب یا بی‌فایده هم می‌تونه خیلی خنده‌دار باشه.',ex:'می‌تونم صدای چندتا شخصیت کارتونی رو تقلید کنم.',lies:['می‌تونم با چشم بسته مسیر خونه تا سوپرمارکت رو برم.','اسم بیشتر پرچم‌های دنیا رو بلدم.','می‌تونم با هر دو دست هم‌زمان بنویسم.','می‌تونم آهنگ تبلیغات قدیمی رو کامل بخونم.']},
+  {e:'📞',c:'اشتباه',p:'تماس یا پیام اشتباهی',h:'یه اشتباه کوچیک که می‌تونه داستان بزرگی بشه.',ex:'یه بار پیام غر زدن درباره یک نفر رو برای خودش فرستادم.',lies:['به‌جای مامانم به مدیرم زنگ زدم و مامان صداش کردم.','یه پیام عاشقانه رو اشتباهی توی گروه فرستادم.','به شماره اشتباهی زنگ زدم و ده دقیقه حرف زدم.','ویس غر زدن درباره ترافیک رو برای راننده تاکسی فرستادم.']}
 ]
 const TIPS=[
-  'دروغ‌ها را هم‌سبک جمله‌ی حقیقت بنویس تا حدس زدن بازی باشد، نه معما.',
-  'حقیقتی را انتخاب کن که یک داستان جذاب پشتش داری.',
-  'از «همیشه» و «هیچ‌وقت» کمتر استفاده کن؛ لو می‌دهند.',
-  'یک دروغ نزدیک به واقعیت از یک دروغ عجیب بهتر کار می‌کند.'
+  'دروغ‌ها رو هم‌سبک حقیقت بنویس؛ هرچی باورپذیرتر، خنده‌دارتر.',
+  'حقیقتی رو انتخاب کن که آخرش یه داستان بامزه برای تعریف کردن داشته باشی.',
+  'از جمله‌های خیلی عجیب دوری کن؛ دروغ باید قابل باور باشه.',
+  'سه جمله رو کوتاه و تقریباً هم‌اندازه نگه دار.'
 ]
 const CHIPS=[
   '🫡 چالش پذیرفته شد',
@@ -99,8 +88,9 @@ function Tip({k}){
 export default function App(){
   const [sess,setSess]=useState(null)
   const [authReady,setAuthReady]=useState(false)
-  const [tab,setTab]=useState('play'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState(''),[secret,setSecret]=useState(false)
+  const [tab,setTab]=useState('home'),[edit,setEdit]=useState(null),[nonce,setNonce]=useState(0),[toast,setToast]=useState(''),[secret,setSecret]=useState(false)
   const [entryNote,setEntryNote]=useState('')
+  const [guestExtras,setGuestExtras]=useState(false)
   const notifiedGuest=useRef(null)
   const [view,setViewS]=useState(()=>localStorage.getItem('view')||'')
   const taps=useRef({n:0,t:0})
@@ -129,11 +119,11 @@ export default function App(){
   useEffect(()=>{
     if(sess?.role!=='guest') return
     let alive=true
-    sb.from('guests').select('id,name,slug,theme,notes,invite_token').eq('id',sess.id).maybeSingle().then(({data,error})=>{
+    sb.from('guests').select('id,name,slug,theme,notes,invite_token,features').eq('id',sess.id).maybeSingle().then(({data,error})=>{
       if(!alive||error)return
       if(!data)return logout()
       const note=noteText(data.notes)
-      save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||'',invite_token:data.invite_token})
+      save({...sess,name:data.name,slug:data.slug,theme:data.theme||'',notes:data.notes||'',invite_token:data.invite_token,features:data.features||{}})
       if(notifiedGuest.current!==data.id){
         notifiedGuest.current=data.id
         if(note)setEntryNote(note)
@@ -145,32 +135,148 @@ export default function App(){
   if(!authReady) return <><Bg/><div className="app login"><div className="skel"/></div></>
   if(!sess) return <><Bg/><Login onOk={save}/></>
   const host=sess.role==='host'
+  if(!host&&!guestExtras&&sess.features?.game!==false) return <><Bg/><GuestJourney sess={sess} say={say} onExtras={()=>setGuestExtras(true)}/><div className={'toast'+(toast?' show':'')}>{toast}</div>{entryNote&&<EntryNotice note={entryNote} onClose={()=>setEntryNote('')}/>}</>
   const tapAv=()=>{
     const t=taps.current,now=Date.now()
     t.n=now-t.t>1600?1:t.n+1;t.t=now
     if(t.n>=5){t.n=0;if(sess.notes){setSecret(true);buzz([15,30,15])}}
   }
-  const tabs=[['play','play','بازی'],['write','pen','بنویس'],['me','user','من']]
+  const feat={page:true,game:true,tot:true,date:false,...(host?{date:true}:sess.features||{})}
+  const tabs=[feat.page&&['home','home','خانه'],feat.game&&['play','play','بازی'],feat.tot&&['tot','tot','انتخاب'],feat.date&&['date','pin','قرار'],['me','user','من']].filter(Boolean)
+  const allowed=tabs.map(t=>t[0])
+  const cur=allowed.includes(tab)||(tab==='write'&&feat.game)?tab:allowed[0]
   return(
     <>
       <Bg/>
       <div className="app">
         <header className="top">
           <div><div className="hi">سلام</div><div className={host?'who':'name sm'}>{sess.name}</div></div>
-          <div className="hr"><button className="hbtn" onClick={help} aria-label="راهنما"><Ic n="help" s={18}/></button><div className="av" onClick={tapAv}>{sess.name[0]}</div></div>
+          <div className="hr">{!host&&sess.features?.game!==false&&<button className="mini" onClick={()=>setGuestExtras(false)}>بازگشت به بازی</button>}<button className="hbtn" onClick={help} aria-label="راهنما"><Ic n="help" s={18}/></button><div className="av" onClick={tapAv}>{sess.name[0]}</div></div>
         </header>
-        <main key={tab+(edit?.id||'')+nonce} className="page">
-          {tab==='play'&&<Play sess={sess} view={view}/>}
-          {tab==='write'&&<Write sess={sess} edit={edit} say={say} onSaved={w=>{setEdit(null);setNonce(n=>n+1);setTab(w?'me':'write')}}/>}
-          {tab==='me'&&<Mine sess={sess} say={say} view={view} setView={setView} onEdit={q=>{setEdit(q);setTab('write')}} onLogout={logout}/>}
+        <main key={cur+(edit?.id||'')+nonce} className="page">
+          {cur==='home'&&<Home sess={sess} say={say}/>}
+          {cur==='play'&&<><div className="between playbar"><span/><button className="mini" onClick={()=>go('write')}><Ic n="pen" s={14}/> سؤال بنویس</button></div><Play sess={sess} view={view}/></>}
+          {cur==='write'&&<Write sess={sess} edit={edit} say={say} onSaved={w=>{setEdit(null);setNonce(n=>n+1);setTab(w?'me':'play')}}/>}
+          {cur==='tot'&&<Tot sess={sess} say={say}/>}
+          {cur==='date'&&<DateTab sess={sess} say={say}/>}
+          {cur==='me'&&<Mine sess={sess} game={feat.game} say={say} view={view} setView={setView} onEdit={q=>{setEdit(q);setTab('write')}} onLogout={logout}/>}
         </main>
       </div>
-      <nav className="tabbar">{tabs.map(([k,ic,lb])=><button key={k} className={tab===k?'on':''} onClick={()=>go(k)}><Ic n={ic}/><span>{lb}</span></button>)}</nav>
+      <nav className="tabbar">{tabs.map(([k,ic,lb])=><button key={k} className={cur===k||(cur==='write'&&k==='play')?'on':''} onClick={()=>go(k)}><Ic n={ic}/><span>{lb}</span></button>)}</nav>
       <div className={'toast'+(toast?' show':'')}>{toast}</div>
       {secret&&<Secret sess={sess} onClose={()=>setSecret(false)}/>}
       {entryNote&&<EntryNotice note={entryNote} onClose={()=>setEntryNote('')}/>}
     </>
   )
+}
+
+function GuestJourney({sess,say,onExtras}){
+  const key=`truths_journey_${sess.id}`
+  const [stage,setStageState]=useState(()=>Math.min(4,Math.max(0,Number(localStorage.getItem(key)||0))))
+  const [writing,setWriting]=useState(false)
+  const [result,setResult]=useState(()=>{try{return JSON.parse(localStorage.getItem(key+'_result'))||{score:0,total:0,choices:0,same:0}}catch{return {score:0,total:0,choices:0,same:0}}})
+  const [challengeDone,setChallengeDone]=useState(()=>localStorage.getItem(key+'_challenge')==='1')
+  useEffect(()=>{localStorage.setItem(key+'_result',JSON.stringify(result))},[key,result])
+  useEffect(()=>{localStorage.setItem(key+'_challenge',challengeDone?'1':'0')},[key,challengeDone])
+  const setStage=n=>{setStageState(n);localStorage.setItem(key,String(n));setWriting(false)}
+  const shareText=async()=>{
+    const text=`پرونده‌ی من و ${HOST_NAME}\n${result.total?`${result.score} از ${result.total} حدس درست`:'یک بازی پر از غافلگیری'}\n${result.choices?`${result.same} انتخاب مشترک از ${result.choices}`:'چند انتخاب بامزه'}\nبین خودمون؛ یه بازی کوچیک برای آدم‌های نزدیک.`
+    try{
+      if(navigator.share) await navigator.share({title:'پرونده‌ی بین خودمون',text})
+      else {await navigator.clipboard.writeText(text);say('متن نتیجه کپی شد')}
+    }catch{}
+  }
+  const shareCard=async()=>{
+    try{
+      await document.fonts?.ready
+      const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1350
+      const ctx=canvas.getContext('2d')
+      const bg=ctx.createLinearGradient(0,0,1080,1350);bg.addColorStop(0,'#101a25');bg.addColorStop(.55,'#0a1019');bg.addColorStop(1,'#17121c');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1350)
+      const glow=ctx.createRadialGradient(820,250,10,820,250,650);glow.addColorStop(0,'rgba(212,180,118,.22)');glow.addColorStop(1,'rgba(212,180,118,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,1080,900)
+      ctx.strokeStyle='rgba(226,198,145,.42)';ctx.lineWidth=2;ctx.strokeRect(48,48,984,1254)
+      ctx.strokeStyle='rgba(255,255,255,.10)';ctx.strokeRect(66,66,948,1218)
+      ctx.direction='rtl';ctx.textAlign='right'
+      ctx.fillStyle='#e7cf9e';ctx.font='600 34px Vazirmatn, sans-serif';ctx.fillText('✦  بین خودمون',950,145)
+      ctx.fillStyle='rgba(255,255,255,.58)';ctx.font='400 24px Vazirmatn, sans-serif';ctx.fillText('پرونده‌ی یک بازی خصوصی',950,198)
+      ctx.fillStyle='#f3eee5';ctx.font='800 70px Vazirmatn, sans-serif';ctx.fillText('خب، اینم از ما دوتا!',950,365)
+      ctx.fillStyle='#d4b476';ctx.font='600 30px Vazirmatn, sans-serif';ctx.fillText(sess.name,950,465)
+      ctx.fillStyle='rgba(255,255,255,.58)';ctx.font='400 26px Vazirmatn, sans-serif';ctx.fillText(`و ${HOST_NAME}`,950,515)
+      const boxes=[{x:90,label:'حدس درست',value:result.total?`${result.score} / ${result.total}`:'—'},{x:555,label:'انتخاب مشترک',value:result.choices?`${result.same} / ${result.choices}`:'—'}]
+      boxes.forEach(b=>{ctx.fillStyle='rgba(255,255,255,.055)';ctx.strokeStyle='rgba(212,180,118,.32)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(b.x,630,435,245,28);ctx.fill();ctx.stroke();ctx.fillStyle='rgba(255,255,255,.58)';ctx.font='400 27px Vazirmatn, sans-serif';ctx.fillText(b.label,b.x+385,705);ctx.fillStyle='#ead5a8';ctx.font='800 66px Vazirmatn, sans-serif';ctx.fillText(b.value,b.x+385,805)})
+      ctx.fillStyle='#eee7da';ctx.font='600 32px Vazirmatn, sans-serif';ctx.fillText(result.total&&result.score===result.total?'ذهن‌خوان حرفه‌ای!':result.total&&result.score===0?'قربانی دروغ‌ها شدم 😂':'هنوز چیزهای زیادی برای کشف هست.',950,1010)
+      ctx.fillStyle='rgba(255,255,255,.52)';ctx.font='400 25px Vazirmatn, sans-serif';ctx.fillText('چند حدس، چند انتخاب و کلی خاطره‌ی کوچک.',950,1090)
+      ctx.fillStyle='#d4b476';ctx.font='600 24px Vazirmatn, sans-serif';ctx.fillText('ساخته‌شده برای آدم‌های نزدیک زندگی‌ات',950,1215)
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'))
+      if(!blob)throw new Error('ساخت تصویر انجام نشد')
+      const file=new File([blob],'bein-khodemun-result.png',{type:'image/png'})
+      if(navigator.canShare?.({files:[file]})){await navigator.share({files:[file],title:'نتیجه‌ی بین خودمون'})}
+      else{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='bein-khodemun-result.png';a.click();URL.revokeObjectURL(url);say('کارت نتیجه ذخیره شد')}
+    }catch(error){console.error('result card failed',error);say('ساخت کارت نتیجه انجام نشد؛ دوباره تلاش کن')}
+  }
+  const showChoices=sess.features?.tot!==false
+  const steps=showChoices?['حدس‌ها','انتخاب‌ها','نوبت تو','یادگاری']:['حدس‌ها','نوبت تو','یادگاری']
+  const displayStage=showChoices?stage:stage===1?1:stage===3?2:stage===4?3:0
+  return <div className="app journey-app">
+    <header className="journey-head">
+      <div><span className="journey-brand">بین خودمون</span><div className="journey-greet">این بازی برای تو ساخته شده</div></div>
+      <button className="journey-more" onClick={onExtras}>پیام‌ها و پروفایل</button>
+    </header>
+    {stage>0&&<div className="journey-progress"><div className="journey-progress-top"><span>پرونده‌ی {sess.name}</span><span>{displayStage} از {steps.length}</span></div><div className="journey-track">{steps.map((x,i)=><i key={x} className={displayStage>=steps.length||i<displayStage-1?'done':i===displayStage-1?'active':''}/>)}</div></div>}
+    <main className="journey-main" key={stage+(writing?'write':'')}>
+      {stage===0&&<div className="journey-cover rise">
+        <div className="journey-orbit"><span>✦</span><i/><b/></div>
+        <div className="journey-kicker">یک بازی خصوصی برای تو</div>
+        <h1>یه نفر فکر می‌کنه<br/>خیلی خوب می‌شناستت.</h1>
+        <p>چند تا حدس، چند انتخاب عجیب و شاید چند تا اعتراف خنده‌دار. ببینیم چقدر همدیگه رو می‌شناسین.</p>
+        <div className="journey-meta"><span>✦ حدود ۵ دقیقه</span><span>✦ بدون جواب درست و غلطِ شخصیتی</span></div>
+        <button className="btn big journey-cta" onClick={()=>setStage(1)}>باز کردن پرونده <span>←</span></button>
+      </div>}
+      {stage===1&&<section className="journey-section rise">
+        <div className="journey-kicker">مرحله اول · کارآگاه شو</div>
+        <h1>دو تا دروغ رو پیدا کن!</h1>
+        <p className="journey-desc">{HOST_NAME} سه جمله درباره‌ی خودش نوشته. دو تاش دروغه؛ ببین می‌تونی مچش رو بگیری یا نه.</p>
+        <div className="journey-game"><Play sess={sess} onComplete={({score,total})=>{setResult(r=>({...r,score,total}));setStage(showChoices?2:3)}}/></div>
+        <p className="journey-footnote">بعد از هر حدس، جواب و داستان پشت حقیقت رو می‌بینی.</p>
+      </section>}
+      {stage===2&&<section className="journey-section rise">
+        <div className="journey-kicker">مرحله دوم · سلیقه‌سنجی</div>
+        <h1>این یا اون؟</h1>
+        <p className="journey-desc">چند انتخاب سریع؛ ببین سلیقه‌هاتون به هم می‌خوره یا نه.</p>
+        <div className="journey-game"><Tot sess={sess} say={say} onComplete={({answered,same})=>{setResult(r=>({...r,choices:answered,same}));setStage(3)}}/></div>
+        <p className="journey-footnote">اینجا قرار نیست کسی برنده بشه؛ فقط قراره سر انتخاب‌هاتون کل‌کل کنین.</p>
+      </section>}
+      {stage===3&&!writing&&<section className="journey-section journey-challenge rise">
+        <div className="journey-kicker">مرحله سوم · حالا نوبت توئه</div>
+        <div className="journey-orbit small-orbit"><span>✍</span><i/><b/></div>
+        <h1>یه کم هم ما رو غافلگیر کن!</h1>
+        <p className="journey-desc">سه جمله درباره‌ی خودت بنویس؛ یکی حقیقت و دوتا دروغ. {HOST_NAME} بعداً باید حقیقت رو پیدا کنه.</p>
+        <div className="journey-suggestions"><span>برای ایده گرفتن:</span><b>سوتی عجیب</b><b>خاطره مدرسه</b><b>خرید احمقانه</b><b>استعداد مخفی</b></div>
+        <button className="btn big journey-cta" onClick={()=>setWriting(true)}>چالش من رو بساز</button>
+        <button className="ghost" onClick={()=>setStage(4)}>فعلاً ردش می‌کنم</button>
+      </section>}
+      {stage===3&&writing&&<section className="journey-write rise">
+        <div className="journey-kicker">چالش تو برای {HOST_NAME}</div>
+        <Write sess={sess} onSaved={()=>{setChallengeDone(true);setStage(4);say('چالشت ثبت شد؛ حالا نوبت حدس زدنه 😏')}} say={say}/>
+      </section>}
+      {stage===4&&<section className="journey-result rise">
+        <div className="result-seal">✦</div>
+        <div className="journey-kicker">پرونده بسته شد · فعلاً!</div>
+        <h1>خب، اینم از شما دوتا!</h1>
+        <p className="journey-desc">یه کم همدیگه رو بهتر شناختین؛ مهم‌تر از امتیاز، جواب‌هایی بود که انتظارشون رو نداشتین.</p>
+        <div className="result-grid">
+          <div><strong>{result.total?result.score:'—'}<small>{result.total?'/'+result.total:''}</small></strong><span>حدس درست</span></div>
+          <div><strong>{result.choices?result.same:'—'}<small>{result.choices?'/'+result.choices:''}</small></strong><span>انتخاب مشترک</span></div>
+        </div>
+        <div className="result-note">{result.total&&result.score===result.total?'ذهن‌خوان حرفه‌ای! دیگه چیزی ازت پنهون نمی‌مونه 😎':result.total&&result.score===0?'قربانیِ دروغ‌ها شدی؛ باید بیشتر تمرین کنی 😂':'هنوز چند تا چیز هست که باید درباره هم کشف کنین.'}</div>
+        {challengeDone&&<div className="challenge-saved">✓ چالش تو هم برای {HOST_NAME} فرستاده شد.</div>}
+        <div className="result-message"><span>یه یادگاری کوچیک</span><b>این بازی تموم شد، ولی کل‌کل‌هاتون می‌تونه ادامه داشته باشه.</b></div>
+        <button className="btn big journey-cta" onClick={shareCard}>ساخت و اشتراک کارت نتیجه</button>
+        <button className="ghost" onClick={shareText}>اشتراک نتیجه به‌صورت متن</button>
+        <button className="ghost" onClick={onExtras}>دیدن پیام‌ها و چیزهای دیگه</button>
+      </section>}
+    </main>
+    <footer className="journey-footer"><span>✦</span> ساخته‌شده برای آدم‌های خاص زندگی‌ات</footer>
+  </div>
 }
 
 function Secret({sess,onClose}){
@@ -218,7 +324,7 @@ function Login({onOk}){
       buzz([20,40,20]);document.documentElement.dataset.theme=session.theme||''
       setHi(session)
       history.replaceState({},'',location.pathname)
-      setTimeout(()=>onOk(session),6000)
+      setTimeout(()=>onOk(session),1800)
     }catch{fail('ارتباط با سرور برقرار نشد؛ دوباره تلاش کن')}
   }
   useEffect(()=>{if(invite)guestEnter(invite)},[])
@@ -238,8 +344,8 @@ function Login({onOk}){
       <Confetti n={70}/><div className="glow"/>
       <div className="eyebrow rise">این لحظه برای توئه</div>
       <h1 className="name rise">{hi.name}</h1>
-      <p className="lead rise" style={{'--d':2}}>خوش اومدی ✨</p>
-      <p className="lead rise" style={{'--d':3}}>این یه تستِ ببینم چقدر منو می‌شناسی؛ بعدش تو هم می‌تونی برام سؤال طراحی کنی که یکم حوصله‌مون سر نره 😄</p>
+      <p className="lead rise" style={{'--d':2}}>یه بازی کوچیک بین خودمون ✦</p>
+      <p className="lead rise" style={{'--d':3}}>چند تا حدس، چند انتخاب و کلی فرصت برای غافلگیر شدن.</p>
     </div>
   )
   if(invite&&busy) return <div className="app login"><div className="glow"/><div className="ring soft">✦</div><p className="lead">دارم در رو برات باز می‌کنم…</p></div>
@@ -336,7 +442,7 @@ function Write({sess,edit,onSaved,say}){
   )
 }
 
-function Mine({sess,say,view,setView,onEdit,onLogout}){
+function Mine({sess,game=true,say,view,setView,onEdit,onLogout}){
   const host=sess.role==='host'
   const [list,setList]=useState(null),[gmap,setGmap]=useState({}),[open,setOpen]=useState(null),[sure,setSure]=useState(false),[sheet,setSheet]=useState(null)
   const copyInvite=async()=>{
@@ -345,6 +451,7 @@ function Mine({sess,say,view,setView,onEdit,onLogout}){
     catch{say(url)}
   }
   const load=async()=>{
+    if(!game){setList([]);return}
     let q=sb.from('questions').select('*, answers(*)').order('created_at',{ascending:false})
     q=host?q.eq('owner','host'):q.eq('owner','guest').eq('guest_id',sess.id)
     const {data}=await q;setList(data||[])
@@ -361,19 +468,19 @@ function Mine({sess,say,view,setView,onEdit,onLogout}){
   }
   return(
     <>
-      <div className="between"><h2 className="h">سؤال‌های من</h2>
+      <div className="between"><h2 className="h">{game?'سؤال‌های من':'من'}</h2>
         <div className="hr">
           <button className="mini" onClick={()=>setSheet('msg')}>💌 پیام</button>
           {host?<button className="mini" onClick={()=>setSheet('set')}><Ic n="gear" s={15}/> تنظیمات</button>
             :<>{sess.invite_token&&<button className="mini" onClick={copyInvite}>🔗 لینک اختصاصی</button>}{BOT&&<a className="mini" href={`https://t.me/${BOT}?start=${sess.slug}`} target="_blank" rel="noreferrer">🔔 تلگرام</a>}</>}
         </div>
       </div>
-      <Tip k="me"/>
-      <div className="stats">
+      {game&&<Tip k="me"/>}
+      {game&&<div className="stats">
         <div><b>{list.length}</b><span>سؤال</span></div><div><b>{nA}</b><span>جواب</span></div><div><b>{nF}</b><span>گول‌خورده</span></div>
-      </div>
+      </div>}
       <div className="grow">
-        {!list.length&&<p className="sub">هنوز سؤالی ننوشته‌ای. از تب «بنویس» شروع کن ✍️</p>}
+        {game&&!list.length&&<p className="sub">هنوز سؤالی ننوشته‌ای. از تب «بنویس» شروع کن ✍️</p>}
         {list.map((q,n)=>{const [t,c]=label(q);return(
           <button key={q.id} className="row rise" style={{'--d':Math.min(n,6)}} onClick={()=>setOpen(q)}>
             <div><b>{q.prompt||q.statements[q.truth_index]}</b></div><span className={'status '+c}>{t}</span>
@@ -531,7 +638,7 @@ function Pick({q,onDone}){
   )
 }
 
-function Play({sess,view}){
+function Play({sess,view,onComplete}){
   const host=sess.role==='host',me=host?'host':sess.id
   const [guests,setGuests]=useState(host?null:[])
   const [qs,setQs]=useState(null),[i,setI]=useState(0),[res,setRes]=useState(null),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[isDemo,setIsDemo]=useState(false),[reportStatus,setReportStatus]=useState('')
@@ -563,10 +670,10 @@ function Play({sess,view}){
     })
   },[host,qs])
   if(!qs) return <div className="skel"/>
-  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">فعلاً سؤال جدیدی نیست</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'وقتی علی سؤال تازه‌ای بنویسد، اینجا می‌آید.'}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد.'}</p>}</div>
+  if(!qs.length) return <div className="empty rise"><div className="ring soft">🫧</div><h2 className="h">{host?'فعلاً سؤالی نیست':'هنوز سؤالی برات نساخته'}</h2><p className="sub">{host?`وقتی ${gname||'مخاطب'} سؤال تازه‌ای بنویسد، اینجا می‌آید.`:'بهش فرصت بده؛ فعلاً می‌تونی بری سراغ مرحله بعد.'}</p>{!host&&<button className="btn big" onClick={()=>onComplete?.({score:0,total:0})}>رفتن به مرحله بعد</button>}{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد.'}</p>}</div>
   if(i>=qs.length){
     const good=score>=Math.ceil(qs.length/2),target=host?(gname||'مخاطبت'):'علی'
-    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد؛ بعداً دوباره تلاش می‌کنیم.'}</p>}{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
+    return <>{good&&<Confetti n={60}/>}<div className="empty rise"><div className="big-score">{score}<small>/{qs.length}</small></div><h2 className="h">{score===qs.length?'کامل خوندی‌ش 😳':good?'خوب می‌شناسی‌ش 😏':'هنوز جا برای شناختن هست ☕'}</h2><p className="sub">{`از ${qs.length} سؤال درباره‌ی ${target}، ${score} تا رو درست حدس زدی.`}</p>{!host&&reportStatus&&<p className="sub">{reportStatus==='sent'?'نتیجه و جواب‌ها به ربات ارسال شد ✅':'ارسال نتیجه به ربات انجام نشد؛ بعداً دوباره تلاش می‌کنیم.'}</p>}{!host&&<button className="btn big" onClick={()=>onComplete?.({score,total:qs.length})}>ادامه‌ی ماجرا</button>}{isDemo&&<button className="ghost" onClick={()=>location.reload()}>برگشت به بازی اصلی</button>}</div></>
   }
   const q=qs[i]
   const done=async lies=>{
