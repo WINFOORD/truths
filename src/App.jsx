@@ -354,7 +354,7 @@ function Login({onOk}){
       <div className="eyebrow rise">{host?'ورود میزبان':'دو دروغ و یک حقیقت'}</div>
       {!host&&<>
         <div className="ring soft rise">✦</div>
-        <h1 className="who big rise" style={{'--d':1}}>این بازی با لینک اختصاصی تو شروع می‌شه</h1>
+        <h1 className="who big rise" style={{'--d':1}}>این بازی با لینک مخصوص تو شروع می‌شه</h1>
         <p className="lead small rise" style={{'--d':2}}>از کسی که دعوتت کرده لینک مخصوص خودت رو بگیر.</p>
       </>}
       {host&&<>
